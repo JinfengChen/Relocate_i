@@ -12,7 +12,13 @@ def usage():
     message='''
 python relocaTE_trim.py te_repeat.blatout 500_1.fq 10 0
 
+sys.argv[1]: blatout or bam
+sys.argv[2]: fastq
+sys.argv[3]: length cutoff for trimmed fastq
+sys.argv[4]: mismatch allowance: mismatch/(mismatch+match) <= mismatch allowance
+
 Parse blat or bam file. Write TE matched reads and their pairs into files.
+*.te_repeat.flankingReads.fq: trimmed reads without TE and reads matched to the middle of TE
 *.ContainingReads.fq: all reads have matches to TE
 *.five_prime.fa/*.three_prime.fa: TE proportion of reads that matched to TE
 *.potential_tandemInserts_containing_reads.list.txt: reads have two or more matches on TE and on same strand. Tandem insertions and Highly false positive.
@@ -28,12 +34,6 @@ def complement(seq):
 
 def reverse_complement(seq):
     return complement(seq[::-1])
-
-def fasta_id(fastafile):
-    fastaid = defaultdict(str)
-    for record in SeqIO.parse(fastafile,"fasta"):
-        fastaid[record.id] = 1
-    return fastaid
 
 
 def parse_align_blat(infile, tandem):
@@ -195,8 +195,8 @@ def main():
                         te_subseq = seq[start:end+1]
                         if strand == '-':
                             te_subseq = reverse_complement(te_subseq)
-                            trimmed_seq = seq[end:]
-                            trimmed_qual= qual[end:]
+                            trimmed_seq = seq[end+1:]
+                            trimmed_qual= qual[end+1:]
                             seq_id   = header
                             seq_desc = ''
                             seq_id   = '%s:start:5' %(seq_id)
@@ -211,6 +211,7 @@ def main():
                         #print 'trimmed: %s %s' %(trimmed_seq, str(end))
                         if len(trimmed_seq) >= len_cutoff:
                             print >> ofile_te5, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
+                    #query read overlaps 3' end of database TE & trimmed seq > cutoff
                     elif tEnd == tLen - 1 and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
                         tS = int(tStart) + 1
                         tE = int(tEnd) + 1
@@ -226,14 +227,23 @@ def main():
                             seq_id   = '%s:end:3' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
                         else:
-                            trimmed_seq = seq[end:]
-                            trimmed_qual= qual[end:]
+                            trimmed_seq = seq[end+1:]
+                            trimmed_qual= qual[end+1:]
                             seq_id   = header
                             seq_desc = ''
                             seq_id   = '%s:start:3' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
                         if len(trimmed_seq) >= len_cutoff:
                             print >> ofile_te3, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
+                    #query read overlaps internal of database TE, no need to trim. These reads pairs will be used as supporting reads
+                    #in relocate_align, we get the reads in trimmed files and their pairs.
+                    elif start == 0 and end + 1 == length and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
+                        trimmed_seq = seq
+                        trimmed_qual= qual
+                        seq_id   = header
+                        seq_desc = ''
+                        seq_id   = '%s:middle' %(seq_id)
+                        header = '%s%s' %(seq_id, seq_desc) 
                     ##trimmed reads
                     if len(trimmed_seq) >= len_cutoff:
                         print '@%s\n%s\n%s\n%s' %(header, trimmed_seq, qualh, trimmed_qual)
