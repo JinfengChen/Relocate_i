@@ -107,11 +107,11 @@ def map_reads_bwa(scripts, flanking_fq, path, genome_file, fastq_dir, target):
     ##map reads with bowtie
     for file_pre in sorted(flanking_fq.keys()):
         #map reads as unpaired, treat all reads as single
-        for file_type in sorted(flanking_fq[file_pre].keys()):
-            fastq   = flanking_fq[file_pre][file_type]
-            fq_name = os.path.splitext(os.path.split(fastq)[1])[0]
-            bwa_run(path, genome_file, fastq, fq_name, target, 'single')
-            bwa_out_files.append('%s/bwa_aln/%s.%s.bwa.single.sam' %(path, target, fq_name))
+        #for file_type in sorted(flanking_fq[file_pre].keys()):
+        #    fastq   = flanking_fq[file_pre][file_type]
+        #    fq_name = os.path.splitext(os.path.split(fastq)[1])[0]
+        #    bwa_run(path, genome_file, fastq, fq_name, target, 'single')
+        #    bwa_out_files.append('%s/bwa_aln/%s.%s.bwa.single.sam' %(path, target, fq_name))
         #map reads as paired, find paired and unpaired and map seperately
         if flanking_fq[file_pre].has_key(1) and flanking_fq[file_pre].has_key(2):
             fastq1  = flanking_fq[file_pre][1]
@@ -134,31 +134,31 @@ def map_reads_bwa(scripts, flanking_fq, path, genome_file, fastq_dir, target):
                 #map unpaired-reads
                 bwa_run(path, genome_file, unpaired, fq_name, target, 'unPaired')
                 bwa_out_files.append('%s/bwa_aln/%s.%s.bwa.unPaired.sam' %(path, target, fq_name))
+        else:
+        #paired not provided or not found, map reads as unpaired
+            fastq   = flanking_fq[file_pre][file_type]
+            fq_name = os.path.splitext(os.path.split(fastq)[1])[0]
+            bwa_run(path, genome_file, fastq, fq_name, target, 'single')
+            bwa_out_files.append('%s/bwa_aln/%s.%s.bwa.single.sam' %(path, target, fq_name))
    
-    ##prepare merged files of bowtie output
-    files2merge = ''
-    filecount   = len(bwa_out_files)
-    if (int(filecount) > 50):
-        ##too many files to merge
-        big_files_2_merge = []
-        count = 0
-        for i in range(filecount)[::50]:
-            count += 1
-            files2merge = ' '.join(bwa_out_files[i:i+50])
-            cmd = 'cat %s > %s/bwa_aln/%s.repeat.merged.bwa.%s.temp' %(files2merge, path, target, count)
-            os.system(cmd)
-            big_files_2_merge.append('%s/bwa_aln/%s.repeat.merged.bwa.%s.temp' %(path, target, count))
-        files2merge = ' '.join(big_files_2_merge)
-    else:
-        ##fewer files to merge
-        files2merge = ' '.join(bwa_out_files)
-
-    ##merge all bowtie results into one file
-    merged_bwa = '%s/bwa_aln/%s.repeat.bwa.sam' %(path, target)
-    if files2merge != '':
-        cmd = 'cat %s > %s' %(files2merge, merged_bwa)
+    ##prepare merged files of bwa output
+    bam2merge = []
+    for i in range(len(bwa_out_files)):
+        sam = bwa_out_files[i]
+        bam = re.sub(r'sam', 'bam', sam)
+        cmd = 'samtools view -h -bS %s > %s' %(sam, bam)
         os.system(cmd)
+        bam2merge.append(bam)
 
+    ##merge all bwa results into one file
+    merged_bwa = '%s/bwa_aln/%s.repeat.bwa.bam' %(path, target)
+    if len(bam2merge) > 0:
+        cmd1  = 'samtools merge %s %s' %(merged_bwa, ' '.join(bam2merge))
+        cmd2  = 'samtools sort %s %s.sorted' %(merged_bwa, os.path.splitext(merged_bwa)[0])
+        cmd3  = 'samtools index %s.sorted.bam' %(os.path.splitext(merged_bwa)[0])
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
 
 
 def bowtie_run(path, genome_file, fastq, fq_name, target, bowtie2, relax_align, bowtie_sam, readclass):
@@ -262,7 +262,7 @@ def main():
     scripts    = sys.argv[1] #full path to scripts directory
     path       = sys.argv[2] #current/top/TE
     genome_file= sys.argv[3]
-    fastq_dir  = sys.argv[4]
+    fastq_dir  = sys.argv[4] #fastq_dir of raw reads, need to get the mates for TE-related reads
     regex_file = sys.argv[5] 
     TE         = sys.argv[6] #TE name, we use repeat for combined analysis
     exper      = sys.argv[7] #prefix for output

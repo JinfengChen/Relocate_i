@@ -146,7 +146,7 @@ def main():
         if args.fastmap is not None:
             blat = 'blat -minScore=10 -tileSize=7 -fastMap %s %s %s 1>> %s' %(te_fasta, fa, blatout, blatstd)
         flank= '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fa_prefix)
-        trim = 'perl %s/relocaTE_trim.pl %s %s 10 0 > %s' %(RelocaTE_bin, blatout, fq, flank)
+        trim = 'perl %s/relocaTE_trim.py %s %s 10 0 > %s' %(RelocaTE_bin, blatout, fq, flank)
         step3_file = '%s/shellscripts/step_3/%s.te_repeat.blat.sh' %(args.outdir, step3_count)
         shells.append('sh %s' %(step3_file))
         step3_cmds = '%s\n%s' %(blat, trim)
@@ -159,7 +159,7 @@ def main():
     createdir('%s/shellscripts/step_4' %(args.outdir))
     step4_file= '%s/shellscripts/step_4/step_4.%s.repeat.align.sh' %(args.outdir, ref)
     shells.append('sh %s' %(step4_file))
-    step4_cmd = 'perl %s/relocaTE_align.pl %s %s/repeat %s %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, args.outdir)
+    step4_cmd = 'perl %s/relocaTE_align.py %s %s/repeat %s %s %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, fastq_dir, args.outdir)
     writefile(step4_file, step4_cmd)
     
     #step5 find insertions
@@ -167,7 +167,7 @@ def main():
     createdir('%s/shellscripts/step_5' %(args.outdir))
     step5_count = 0
     for chrs in ids:
-        step5_cmd = 'perl %s/relocaTE_insertionFinder.pl %s/repeat/bowtie_aln/%s.repeat.bowtie.out %s %s repeat %s/regex.txt not.give 100 NONE 0 0' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir)
+        step5_cmd = 'perl %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/RelocaTE_multiTE/RelocaTE_output_RD/HEG4.mPing.all_reference.txt 0 0' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir)
         step5_file= '%s/shellscripts/step_5/%s.repeat.findSites.sh' %(args.outdir, step5_count)
         shells.append('sh %s' %(step5_file))
         writefile(step5_file, step5_cmd)
