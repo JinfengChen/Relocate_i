@@ -15,7 +15,33 @@ python CircosConf.py --input circos.config --output pipe.conf
     '''
     print message
 
-def write_output(result, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads):
+#[name, seq, start, strand]
+def Supporting_count(event, tsd_start, teSupportingReads):
+    total = 0
+    right = 0
+    left  = 0
+    read1 = []
+    read2 = []
+    if teSupportingReads.has_key(event):
+        for read in teSupportingReads[event]:
+            name   = read[0]
+            seq    = read[1]
+            start  = read[2]
+            strand = read[3]
+            #print name, seq, start, strand
+            if int(start) + len(seq) <= int(tsd_start) and strand == '+':
+                total += 1
+                left  += 1
+                read1.append(name)
+            elif int(start) >= int(tsd_start) and strand == '-':
+                total += 1
+                right += 1
+                read2.append(name)
+        return (total, left, right, read1, read2)
+    else:
+        return (0,0,0,'','') 
+
+def write_output(result, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads):
     createdir(result)
     NONREF = open ('%s/%s.%s.all_nonref_insert.txt' %(result, usr_target, TE), 'w')
     READS  = open ('%s/%s.%s.reads.list' %(result, usr_target, TE), 'w')
@@ -23,11 +49,17 @@ def write_output(result, usr_target, exper, TE, required_reads, required_left_re
     #teInsertions[event][TSD_seq][TSD_start][pos]       += 1   ## right/left junction reads
     #teInsertions[event][TSD_seq][TSD_start][TE_orient] += 1   ## plus/reverse insertions 
     for event in sorted(teInsertions.keys(), key=int):
-        print 'event: %s' %(event)
+        #print 'event: %s' %(event)
+        total_supporting = 0
+        left_supporting  = 0
+        right_supporting = 0
+        left_reads       = ''
+        right_reads      = ''
         for start in sorted(teInsertions[event].keys(), key=int):
-            print 'tsd: %s' %(start)
+            #print 'tsd: %s' %(start)
+            total_supporting, left_supporting, right_supporting, left_reads, right_reads = Supporting_count(event, start, teSupportingReads)
             for foundTSD in sorted(teInsertions[event][start].keys()):
-                print 'start: %s' %(start)
+                #print 'start: %s' %(start)
                 #print event, foundTSD, start
                 if len(teInsertions[event][start].keys()) > 1 and int(teInsertions[event][start][foundTSD]['count']) == 1:
                     #two or more TSD at this loci, some might be caused by sequencing error
@@ -41,18 +73,20 @@ def write_output(result, usr_target, exper, TE, required_reads, required_left_re
                 right_count       = teInsertions[event][start][foundTSD]['right'] if teInsertions[event][start][foundTSD]['right'] else 0
                 reads             = ','.join(teInsertions_reads[event][start][foundTSD]['read'])
                 #print left_count, right_count
-                print event, foundTSD, start, total_count, left_count, right_count, reads
+                #print event, foundTSD, start, total_count, left_count, right_count, reads
                 if int(left_count) >= int(required_left_reads) or int(right_count) >= int(required_right_reads):
                     coor       = int(start) + (len(foundTSD) - 1)
                     coor_start = coor - (len(foundTSD) - 1)
                     print >> READS, '%s\t%s:%s..%s\t%s' %(TE, usr_target, coor_start, coor, reads)
-                    if left_count > 0 and right_count >0:
-                        print >> NONREF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s' %(TE, foundTSD, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count)
-                    elif left_count == 1 or right_count == 1:
-                        print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s' %(TE, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count)
+                    if int(left_count) > 0 and int(right_count) >0:
+                        print >> NONREF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(TE, foundTSD, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
+                    elif int(left_count) == 1 or int(right_count) == 1:
+                        print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(TE, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
                     else:
-                        print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s' %(TE, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count)
-
+                        if int(right_supporting) >= 2 and int(left_supporting) >= 2:
+                            print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(TE, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
+                        else:
+                            print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(TE, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
 
 def TSD_from_read_depth(teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
     #determine TSD from read depth at insertions site
@@ -85,36 +119,43 @@ def TSD_from_read_depth(teReadClusters, teReadClusters_count, teReadClusters_dep
             pass
             #what if we can not find TSD? still could be insertions
 
-def align_process(bin_ins, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth):
-    range_allowance = 0
+
+def align_process(bin_ins, record, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads):
+    range_allowance = 500
     padded_start    = bin_ins[0] - range_allowance
-    padded_end      = bin_ins[-1] - range_allowance 
-    m = r.search(name)
-    if m:
-        #insertions
-        #print 'insertions: %s' %(name)
-        if (int(start) >= padded_start and int(start) <= padded_end) or (int(end) >= padded_start and int(end) <= padded_end):
-            bin_ins.extend([int(start), int(end)])
-            bin_ins = sorted(bin_ins, key=int)
+    padded_end      = bin_ins[-1] + range_allowance 
+    #insertions
+    #print 'insertions: %s' %(name)
+    if (int(start) >= padded_start and int(start) <= padded_end) or (int(end) >= padded_start and int(end) <= padded_end):
+        bin_ins.extend([int(start), int(end)])
+        bin_ins = sorted(bin_ins, key=int)
+        if r.search(name):
             if not r_tsd.search(TSD):
                 TSD_check(count, seq, start, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
             else:
                 calculate_cluster_depth(count, seq, start, name, strand, teReadClusters, teReadClusters_count, teReadClusters_depth)
-        else:
-            #if start and end do not fall within last start and end
-            #we now have a different insertion event
-            count += 1
-            if not r_tsd.search(TSD):
-                TSD_check(count, seq, start, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
-            else:
-                calculate_cluster_depth(count, seq, start, name, strand, teReadClusters, teReadClusters_count, teReadClusters_depth)
-            #initial insertion site boundary
-            bin_ins = [int(start), int(end)]
-            #print '%s\t%s' %(count, bin_ins)
+        elif not r.search(name) and not record.is_paired:
+            #reads not matched to repeat and not mates of junctions
+            #reads are mates of reads matched to middle of repeat
+            #supporting reads
+            teSupportingReads[count].append([name, seq, start, strand])
     else:
-        #supporting reads
-        #print 'supportings: %s' %(name)
-        pass
+        #if start and end do not fall within last start and end
+        #we now have a different insertion event
+        count += 1
+        if r.search(name):
+            if not r_tsd.search(TSD):
+                TSD_check(count, seq, start, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
+            else:
+                calculate_cluster_depth(count, seq, start, name, strand, teReadClusters, teReadClusters_count, teReadClusters_depth)
+        elif not r.search(name) and not record.is_paired:
+            #reads not matched to repeat and not mates of junctions
+            #reads are mates of reads matched to middle of repeat
+            #supporting reads
+            teSupportingReads[count].append([name, seq, start, strand])
+        #initial insertion site boundary
+        bin_ins = [int(start), int(end)]
+        #print '%s\t%s' %(count, bin_ins)
     return (bin_ins, count)
 
 def existingTE(infile, existingTE_inf, existingTE_found):
@@ -229,7 +270,7 @@ def convert_tag(tag):
         tags[t[0]] = t[1]
     return tags
 
-def find_insertion_cluster_bam(align_file, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found):
+def find_insertion_cluster_bam(align_file, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads):
     r = re.compile(r':(start|end):(5|3)')
     r_tsd = re.compile(r'UNK|UKN|unknown', re.IGNORECASE)
     r_cg  = re.compile(r'[SID]')
@@ -265,10 +306,10 @@ def find_insertion_cluster_bam(align_file, target, TSD, teInsertions, teInsertio
             # 2. unpaired reads should unique mapped, no gap, mismatch <= 3 and no suboptimal alignment
             #print 'before: %s\t%s\t%s' %(name, count, bin_ins)
             if record.is_proper_pair and int(MAPQ) >= 29:
-                bin_ins, count = align_process(bin_ins, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth)
+                bin_ins, count = align_process(bin_ins, record, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             elif not record.is_paired:
                 if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['XM']) <= 3 and int(tags['X1']) == 0:
-                    bin_ins, count = align_process(bin_ins, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth)
+                    bin_ins, count = align_process(bin_ins, record, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             #print 'after: %s\t%s\t%s' %(name, count, bin_ins)
 
     ###TSD not given we infer from read depth
@@ -397,6 +438,7 @@ def main():
     teReadClusters       = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : str()))))
     teReadClusters_count = defaultdict(lambda : defaultdict(lambda : int()))
     teReadClusters_depth = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : int()))))
+    teSupportingReads    = defaultdict(lambda : list())
 
     #read existing TE from file
     if os.path.isfile(existing_TE) and os.path.getsize(existing_TE) > 0:
@@ -423,13 +465,13 @@ def main():
     
     ##cluster reads around insertions
     #find_insertion_cluster_sam(sorted_align, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found)
-    find_insertion_cluster_bam(align_file, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found)
+    find_insertion_cluster_bam(align_file, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads)
 
 
     ##output insertions
     top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
     result  = '%s/results' %('/'.join(top_dir))
-    write_output(result, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads)
+    write_output(result, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads)
 
  
 if __name__ == '__main__':
