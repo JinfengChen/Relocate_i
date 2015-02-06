@@ -36,9 +36,9 @@ def reverse_complement(seq):
     return complement(seq[::-1])
 
 
-def parse_align_blat(infile, tandem):
+def parse_align_blat(infile, tandem, read_repeat_file):
     coord = defaultdict(lambda : defaultdict(lambda : str))
-
+    read_repeat = defaultdict(lambda : defaultdict(lambda : int())) 
     ##align_file
     ofile = open(tandem, 'w')
     with open (infile, 'r') as filehd:
@@ -54,12 +54,13 @@ def parse_align_blat(infile, tandem):
             qLen     = int(unit[10])
             qStart   = int(unit[11])
             qEnd     = int(unit[12]) - 1
+            tName    = unit[13]
             tLen     = int(unit[14])
             tStart   = int(unit[15])
             #get all values into 1st base = 0 postion notation
             tEnd     = int(unit[16]) - 1 
             addRecord = 0
-
+            read_repeat[qName][tName] = 1
             if coord.has_key(qName):
                 if strand == coord[qName]['strand']:
                     ##if there is are tandem insertions, theses reads
@@ -94,6 +95,11 @@ def parse_align_blat(infile, tandem):
                 coord[qName]['tStart']   = tStart
                 coord[qName]['tEnd']     = tEnd
     ofile.close()
+    ofile = open(read_repeat_file, 'w')
+    for read_name in sorted(read_repeat.keys()):
+        repeats = ','.join(sorted(read_repeat[read_name].keys()))
+        print >> ofile, '%s\t%s' %(read_name, repeats)
+    ofile.close()
     return coord
  
 
@@ -116,11 +122,11 @@ def main():
     out_fq_path= '%s/te_containing_fq' %('/'.join(te_path))
     out_fa_path= '%s/te_only_read_portions_fa' %('/'.join(te_path))
     tandem_file= '%s/%s.potential_tandemInserts_containing_reads.list.txt' %(out_fq_path, file_name)
-    
+    read_repeat_file = '%s/%s.read_repeat_name.txt' %(out_fq_path, file_name) 
     #parse align
     coord = defaultdict(lambda : defaultdict(lambda : str))
     if align_type == 'blat':
-        coord = parse_align_blat(align_file, tandem_file)
+        coord = parse_align_blat(align_file, tandem_file, read_repeat_file)
     
     #outfiles
     TE = 'unspecified'

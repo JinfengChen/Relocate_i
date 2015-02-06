@@ -95,18 +95,21 @@ def main():
 
     shells = []
     #step0 existing TE blat
+    reference_ins_flag = 'NONE'
     if args.reference_ins is None or args.reference_ins == '0':
         step0_file = '%s/shellscripts/step_0_do_not_call_reference_insertions' %(args.outdir)
+        writefile(step0_file, '')
+    elif os.path.isfile(args.reference_ins):
+        step0_file = '%s/shellscripts/step_0_te_annotation_provided' %(args.outdir)
+        reference_ins_flag = args.reference_ins
         writefile(step0_file, '')
     elif args.reference_ins == '1':
         createdir('%s/shellscripts/step_0' %(args.outdir))
         step0_file = '%s/shellscripts/step_0/step_0.existingTE_blat.sh' %(args.outdir)
         shells.append('sh %s' %(step0_file))
         existingTE_blat = 'blat %s %s %s/existingTE.blatout 1> %s/existingTE.blat.stdout' %(reference, te_fasta, args.outdir, args.outdir)
+        reference_ins_flag = '%s/existingTE.blatout' %(args.outdir)
         writefile(step0_file, existingTE_blat)
-    elif os.path.isfile(args.reference_ins):
-        step0_file = '%s/shellscripts/step_0_te_annotation_provided' %(args.outdir)
-        writefile(step0_file, '')
 
     #step1 format reference genome
 
@@ -167,7 +170,7 @@ def main():
     createdir('%s/shellscripts/step_5' %(args.outdir))
     step5_count = 0
     for chrs in ids:
-        step5_cmd = 'perl %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/RelocaTE_multiTE/RelocaTE_output_RD/HEG4.mPing.all_reference.txt 0 0' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir)
+        step5_cmd = 'perl %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag)
         step5_file= '%s/shellscripts/step_5/%s.repeat.findSites.sh' %(args.outdir, step5_count)
         shells.append('sh %s' %(step5_file))
         writefile(step5_file, step5_cmd)

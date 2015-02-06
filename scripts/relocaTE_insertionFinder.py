@@ -6,6 +6,7 @@ import re
 import os
 import argparse
 import pysam
+import glob
 
 def usage():
     test="name"
@@ -37,12 +38,77 @@ def Supporting_count(event, tsd_start, teSupportingReads):
                 total += 1
                 right += 1
                 read2.append(name)
-        return (total, left, right, read1, read2)
+        return (total, left, right, ','.join(read1), ','.join(read2))
     else:
         return (0,0,0,'','') 
 
-def write_output(result, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads):
+def read_repeat_name(infiles):
+    data = defaultdict(str)
+    for infile in infiles:
+        with open (infile, 'r') as filehd:
+            for line in filehd:
+                line = line.rstrip()
+                if len(line) > 2: 
+                    unit = re.split(r'\t',line)
+                    data[unit[0]] = unit[1]
+    return data
+
+#s1= re.compile(r'(\S+)\.[rf]')
+#s2= re.compile(r'(\S+)\/[12]')
+## define insertion as repeat family according reads <-> repeats relation from blat or bam files
+def insertion_family_supporting(reads, read_repeat):
+    repeat_family = defaultdict(lambda : int())
+    for read in re.split(r',', reads):
+        read_name  = read
+        read_name1 = '%s/1' %(read)
+        read_name2 = '%s/2' %(read)
+        read_name3 = '%s.f' %(read)
+        read_name4 = '%s.r' %(read)
+        if read_repeat.has_key(read_name):
+            repeat_family[read_repeat[read_name]] += 1
+        elif read_repeat.has_key(read_name1):
+            repeat_family[read_repeat[read_name1]] += 1
+            #print '%s,%s,%s,' %(read_name, read_name1, read_repeat[read_name1])
+        elif read_repeat.has_key(read_name2):
+            repeat_family[read_repeat[read_name2]] += 1
+            #print '%s,%s,%s,' %(read_name, read_name2, read_repeat[read_name2])
+        elif read_repeat.has_key(read_name3):
+            repeat_family[read_repeat[read_name3]] += 1
+        elif read_repeat.has_key(read_name4):
+            repeat_family[read_repeat[read_name4]] += 1
+    if len(repeat_family.keys()) == 1:
+        #return first element if only have one repeat
+        return repeat_family.keys()[0]
+    elif len(repeat_family.keys()) > 1:
+        #return the one have largest value
+        sorted_by_value = OrderedDict(sorted(repeat_family.items(), key=lambda x: x[1]))
+        return sorted_by_value.keys()[-1]
+    else:
+        return 'NA'
+
+
+## define insertion as repeat family according reads <-> repeats relation from blat or bam files
+def insertion_family(reads, read_repeat):
+    repeat_family = defaultdict(lambda : int())
+    r = re.compile(r'(.*):(start|end):(5|3)')
+    for read in re.split(r',', reads):
+        m = r.search(read)
+        read_name = m.groups(0)[0] if m else 'NA'
+        if read_name != 'NA' and read_repeat.has_key(read_name):
+            repeat_family[read_repeat[read_name]] += 1
+    if len(repeat_family.keys()) == 1:
+        #return first element if only have one repeat
+        return repeat_family.keys()[0]
+    elif len(repeat_family.keys()) > 1:
+        #return the one have largest value
+        sorted_by_value = OrderedDict(sorted(repeat_family.items(), key=lambda x: x[1]))
+        return sorted_by_value.keys()[-1]
+    else:
+        return ''
+
+def write_output(result, read_repeat_files, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads):
     createdir(result)
+    read_repeat = read_repeat_name(read_repeat_files)
     NONREF = open ('%s/%s.%s.all_nonref_insert.txt' %(result, usr_target, TE), 'w')
     READS  = open ('%s/%s.%s.reads.list' %(result, usr_target, TE), 'w')
     #teInsertions[event][TSD_seq][TSD_start]['count']   += 1   ## total junction reads
@@ -58,6 +124,8 @@ def write_output(result, usr_target, exper, TE, required_reads, required_left_re
         for start in sorted(teInsertions[event].keys(), key=int):
             #print 'tsd: %s' %(start)
             total_supporting, left_supporting, right_supporting, left_reads, right_reads = Supporting_count(event, start, teSupportingReads)
+            repeat_supporting = insertion_family_supporting('%s,%s' %(left_reads, right_reads), read_repeat)
+            #print 'supporting: %s' %(repeat_supporting)
             for foundTSD in sorted(teInsertions[event][start].keys()):
                 #print 'start: %s' %(start)
                 #print event, foundTSD, start
@@ -72,6 +140,19 @@ def write_output(result, usr_target, exper, TE, required_reads, required_left_re
                 left_count        = teInsertions[event][start][foundTSD]['left'] if teInsertions[event][start][foundTSD]['left'] else 0
                 right_count       = teInsertions[event][start][foundTSD]['right'] if teInsertions[event][start][foundTSD]['right'] else 0
                 reads             = ','.join(teInsertions_reads[event][start][foundTSD]['read'])
+                repeat_junction   = insertion_family(reads, read_repeat)
+                #print 'junction: %s' %(repeat_junction)
+                #guess the repeat family of insertion
+                repeat_family     = 'NA'
+                if repeat_junction == repeat_supporting and repeat_junction != 'NA':
+                    repeat_family = repeat_junction
+                elif repeat_junction != repeat_supporting and repeat_junction != 'NA' and repeat_supporting != 'NA':
+                    repeat_family = '%s/%s' %(repeat_junction, repeat_supporting)
+                elif repeat_junction != 'NA':
+                    repeat_family = repeat_junction
+                elif repeat_supporting != 'NA':
+                    repeat_family = repeat_supporting
+                
                 #print left_count, right_count
                 #print event, foundTSD, start, total_count, left_count, right_count, reads
                 if int(left_count) >= int(required_left_reads) or int(right_count) >= int(required_right_reads):
@@ -79,14 +160,15 @@ def write_output(result, usr_target, exper, TE, required_reads, required_left_re
                     coor_start = coor - (len(foundTSD) - 1)
                     print >> READS, '%s\t%s:%s..%s\t%s' %(TE, usr_target, coor_start, coor, reads)
                     if int(left_count) > 0 and int(right_count) >0:
-                        print >> NONREF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(TE, foundTSD, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
+                        print >> NONREF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, foundTSD, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
                     elif int(left_count) == 1 or int(right_count) == 1:
-                        print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(TE, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
+                        print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
                     else:
                         if int(right_supporting) >= 2 and int(left_supporting) >= 2:
-                            print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(TE, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
+                            print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
                         else:
-                            print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(TE, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
+                            print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
+
 
 def TSD_from_read_depth(teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
     #determine TSD from read depth at insertions site
@@ -196,7 +278,7 @@ def TSD_check(event, seq, start, name, TSD, strand, teInsertions, teInsertions_r
     ##TSD already specified by usr, not unknown
     ##seq is entire trimmd read, not just the TSD portion of the read
     ##start is the first postition of the entire read match to ref
-    repeat = 'mPing' # need to deal with any te
+    repeat = 'mPing' # need to deal with any te, get infor from name of reads
     rev_com = reverse_complement(seq)
     result    = 0
     pos       = ''
@@ -443,6 +525,8 @@ def main():
     #read existing TE from file
     if os.path.isfile(existing_TE) and os.path.getsize(existing_TE) > 0:
         existingTE(existing_TE, existingTE_inf, existingTE_found)
+    else:
+        print 'Existing TE file does not exists or zero size'
 
     ##get the regelar expression patterns for mates and for the TE
     ##when passed on the command line as an argument, even in single
@@ -471,7 +555,8 @@ def main():
     ##output insertions
     top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
     result  = '%s/results' %('/'.join(top_dir))
-    write_output(result, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads)
+    read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
+    write_output(result, read_repeat_files, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads)
 
  
 if __name__ == '__main__':
