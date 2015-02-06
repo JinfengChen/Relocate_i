@@ -36,9 +36,8 @@ def reverse_complement(seq):
     return complement(seq[::-1])
 
 
-def parse_align_blat(infile, tandem, read_repeat_file):
+def parse_align_blat(infile, tandem):
     coord = defaultdict(lambda : defaultdict(lambda : str))
-    read_repeat = defaultdict(lambda : defaultdict(lambda : int())) 
     ##align_file
     ofile = open(tandem, 'w')
     with open (infile, 'r') as filehd:
@@ -60,7 +59,6 @@ def parse_align_blat(infile, tandem, read_repeat_file):
             #get all values into 1st base = 0 postion notation
             tEnd     = int(unit[16]) - 1 
             addRecord = 0
-            read_repeat[qName][tName] = 1
             if coord.has_key(qName):
                 if strand == coord[qName]['strand']:
                     ##if there is are tandem insertions, theses reads
@@ -92,13 +90,9 @@ def parse_align_blat(infile, tandem, read_repeat_file):
                 coord[qName]['tLen']     = tLen
                 coord[qName]['mismatch'] = mismatch
                 coord[qName]['strand']   = strand
+                coord[qName]['tName']    = tName
                 coord[qName]['tStart']   = tStart
                 coord[qName]['tEnd']     = tEnd
-    ofile.close()
-    ofile = open(read_repeat_file, 'w')
-    for read_name in sorted(read_repeat.keys()):
-        repeats = ','.join(sorted(read_repeat[read_name].keys()))
-        print >> ofile, '%s\t%s' %(read_name, repeats)
     ofile.close()
     return coord
  
@@ -126,7 +120,7 @@ def main():
     #parse align
     coord = defaultdict(lambda : defaultdict(lambda : str))
     if align_type == 'blat':
-        coord = parse_align_blat(align_file, tandem_file, read_repeat_file)
+        coord = parse_align_blat(align_file, tandem_file)
     
     #outfiles
     TE = 'unspecified'
@@ -162,6 +156,7 @@ def main():
         ofile_fq = open('%s/%s.te_%s.ContainingReads.fq' %(out_fq_path, FA, TE), 'w')
         ofile_te5= open('%s/%s.te_%s.five_prime.fa' %(out_fa_path, FA, TE), 'w')
         ofile_te3= open('%s/%s.te_%s.three_prime.fa' %(out_fa_path, FA, TE), 'w')
+        ofile_rr = open(read_repeat_file, 'w')
         ##go thru each fq record in the fq files. if the name of the seq is in the blat file
         ##trim the seq
         with open (fq_file1, 'r') as filehd:
@@ -169,6 +164,7 @@ def main():
                 line = line.rstrip()
                 header = line[1:]
                 header = re.split(r'\s+', header)[0]
+                rl_name= header
                 seq    = filehd.next().rstrip()
                 qualh  = filehd.next().rstrip()
                 qual   = filehd.next().rstrip()
@@ -177,6 +173,7 @@ def main():
                     start    = int(coord[header]['start'])
                     length   = int(coord[header]['len'])
                     end      = int(coord[header]['end'])
+                    tName    = coord[header]['tName']
                     tStart   = int(coord[header]['tStart'])
                     tEnd     = int(coord[header]['tEnd'])
                     tLen     = int(coord[header]['tLen'])
@@ -216,6 +213,7 @@ def main():
                             header = '%s%s' %(seq_id, seq_desc)
                         #print 'trimmed: %s %s' %(trimmed_seq, str(end))
                         if len(trimmed_seq) >= len_cutoff:
+                            print >> ofile_rr, '%s\t%s' %(rl_name, tName)
                             print >> ofile_te5, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
                     #query read overlaps 3' end of database TE & trimmed seq > cutoff
                     elif tEnd == tLen - 1 and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
@@ -240,6 +238,7 @@ def main():
                             seq_id   = '%s:start:3' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
                         if len(trimmed_seq) >= len_cutoff:
+                            print >> ofile_rr, '%s\t%s' %(rl_name, tName)
                             print >> ofile_te3, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
                     #query read overlaps internal of database TE, no need to trim. These reads pairs will be used as supporting reads
                     #in relocate_align, we get the reads in trimmed files and their pairs.
@@ -249,13 +248,17 @@ def main():
                         seq_id   = header
                         seq_desc = ''
                         seq_id   = '%s:middle' %(seq_id)
-                        header = '%s%s' %(seq_id, seq_desc) 
+                        header = '%s%s' %(seq_id, seq_desc)
+                        print >> ofile_rr, '%s\t%s' %(rl_name, tName) 
                     ##trimmed reads
                     if len(trimmed_seq) >= len_cutoff:
                         print '@%s\n%s\n%s\n%s' %(header, trimmed_seq, qualh, trimmed_qual)
                     ##any read that was in the blat file is written here
                     print >> ofile_fq, '@%s\n%s\n%s\n%s' %(header, seq, qualh, qual)
-
+        ofile_te5.close()
+        ofile_te3.close()
+        ofile_fq.close()
+        ofile_rr.close()
 if __name__ == '__main__':
     main()
 

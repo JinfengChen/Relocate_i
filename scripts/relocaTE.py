@@ -85,7 +85,7 @@ def main():
         args.outdir = os.path.abspath(args.outdir)
         createdir(args.outdir)
 
-    writefile('%s/regex.txt' %(args.outdir), '_1\t_2\t.unPaired\t...')
+    writefile('%s/regex.txt' %(args.outdir), '_1\t_2\t.unPaired\tUNK')
     createdir('%s/shellscripts' %(args.outdir))
     createdir('%s/repeat' %(args.outdir))
     createdir('%s/repeat/blat_output' %(args.outdir))
