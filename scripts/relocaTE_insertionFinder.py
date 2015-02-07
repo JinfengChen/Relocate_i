@@ -127,10 +127,10 @@ def write_output(result, read_repeat, usr_target, exper, TE, required_reads, req
             #print 'supporting: %s' %(repeat_supporting)
             for foundTSD in sorted(teInsertions[event][start].keys()):
                 #print 'start: %s' %(start)
-                #print event, foundTSD, start
+                print event, start, foundTSD
                 if len(teInsertions[event][start].keys()) > 1 and int(teInsertions[event][start][foundTSD]['count']) == 1:
                     #two or more TSD at this loci, some might be caused by sequencing error
-                    #we skip this keys if the coverage is 1 (singleton) for this case
+                    #we skip these keys if the coverage is 1 (singleton) for this case
                     continue
                 TE_orient_foward  = teInsertions[event][start][foundTSD]['+'] if teInsertions[event][start][foundTSD].has_key('+') else 0
                 TE_orient_reverse = teInsertions[event][start][foundTSD]['-'] if teInsertions[event][start][foundTSD].has_key('-') else 0
@@ -140,6 +140,11 @@ def write_output(result, read_repeat, usr_target, exper, TE, required_reads, req
                 right_count       = teInsertions[event][start][foundTSD]['right'] if teInsertions[event][start][foundTSD]['right'] else 0
                 reads             = ','.join(teInsertions_reads[event][start][foundTSD]['read'])
                 repeat_junction   = insertion_family(reads, read_repeat)
+
+                #if len(teInsertions[event].keys()) > 1 and (int(left_count) == 0 or int(right_count) == 0):
+                    # two or more insertion found at one read cluster, some might be caused by sequencing or mapping error
+                    # we skip these keys if only have junction reads from one side
+                #    continue
                 #print 'junction: %s' %(repeat_junction)
                 #guess the repeat family of insertion
                 repeat_family     = 'NA'
@@ -153,11 +158,13 @@ def write_output(result, read_repeat, usr_target, exper, TE, required_reads, req
                     repeat_family = repeat_supporting
                 
                 #print left_count, right_count
-                #print event, foundTSD, start, total_count, left_count, right_count, reads
+                print event, foundTSD, start, total_count, left_count, right_count, reads
                 if int(left_count) >= int(required_left_reads) or int(right_count) >= int(required_right_reads):
                     coor       = int(start) + (len(foundTSD) - 1)
                     coor_start = coor - (len(foundTSD) - 1)
-                    print >> READS, '%s\t%s:%s..%s\t%s' %(TE, usr_target, coor_start, coor, reads)
+                    print >> READS, '%s\t%s:%s..%s\tJunction_reads\t%s' %(TE, usr_target, coor_start, coor, reads)
+                    print >> READS, '%s\t%s:%s..%s\tLeft_supporting_reads\t%s' %(TE, usr_target, coor_start, coor, left_reads)
+                    print >> READS, '%s\t%s:%s..%s\tRight_supporting_reads\t%s' %(TE, usr_target, coor_start, coor, right_reads)
                     if int(left_count) > 0 and int(right_count) >0:
                         print >> NONREF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, foundTSD, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
                     elif int(left_count) == 1 or int(right_count) == 1:
@@ -183,7 +190,7 @@ def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, te
         TSD_len = 0 
         for chrs_pos in sorted(teReadClusters_depth[cluster]['read_inf']['depth'].keys(), key=int):
             depth = teReadClusters_depth[cluster]['read_inf']['depth'][chrs_pos]
-            if int(depth) == int(read_total):
+            if float(depth) >= 0.8*float(read_total):
                 TSD_len += 1
         if TSD_len > 0:
             TSD = '.'*TSD_len
@@ -386,13 +393,15 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             tags = convert_tag(tag)
             #print '%s\t%s\t%s' %(name, start, length)
             # filter low quality mapping reads: 
-            # 1. paired-end reads at least have one reads unique mapped (MAPQ >= 29? test)
+            # 1. paired-end reads at least have one reads unique mapped (MAPQ set to 0 for both reads if both are repeat, else should be > 0 at least one unique mapped)
             # 2. unpaired reads should unique mapped, no gap, mismatch <= 3 and no suboptimal alignment
             #print 'before: %s\t%s\t%s' %(name, count, bin_ins)
-            if record.is_proper_pair and int(MAPQ) >= 29:
+            #if record.is_proper_pair and (int(MAPQ) >= 29 or tags['XT'] == 'U'):
+            if record.is_proper_pair and int(MAPQ) > 0:
                 bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             elif not record.is_paired:
-                if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['XM']) <= 3 and int(tags['X1']) == 0:
+                #if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['XM']) <= 3 and int(tags['X1']) == 0:
+                if tags['XT'] == 'U' and int(tags['XO']) == 0 and (int(tags['XM']) <= 3 or int(tags['X1']) == 0):
                     bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             #print 'after: %s\t%s\t%s' %(name, count, bin_ins)
 
