@@ -115,65 +115,124 @@ def write_output(result, read_repeat, usr_target, exper, TE, required_reads, req
     #teInsertions[event][TSD_seq][TSD_start][TE_orient] += 1   ## plus/reverse insertions 
     for event in sorted(teInsertions.keys(), key=int):
         #print 'event: %s' %(event)
-        total_supporting = 0
-        left_supporting  = 0
-        right_supporting = 0
-        left_reads       = ''
-        right_reads      = ''
+        cluster_collection = []
+        start_collection = []
+        start_both_junction = 0
         for start in sorted(teInsertions[event].keys(), key=int):
-            #print 'tsd: %s' %(start)
+            #####supporting reads
+            total_supporting, left_supporting, right_supporting = [0, 0, 0]
+            left_reads, right_reads = ['', '']
             total_supporting, left_supporting, right_supporting, left_reads, right_reads = Supporting_count(event, start, teSupportingReads)
             repeat_supporting = insertion_family_supporting('%s,%s' %(left_reads, right_reads), read_repeat)
-            #print 'supporting: %s' %(repeat_supporting)
+            
+            #####tsd within one start position into one start position
+            tsd_count         = {}
+            TE_orient, repeat_junction = ['','']
+            TE_orient_foward, TE_orient_reverse    = [0,0]
+            total_count, left_count, right_count   = [0,0,0]
+            reads             = []
+            #if two or more TSD at this loci, some might be caused by sequencing error, we add the count
+            #and use high frequent one to get te orientation and family
+            #if only one TSD found, we acturally use only this one
             for foundTSD in sorted(teInsertions[event][start].keys()):
-                #print 'start: %s' %(start)
-                print event, start, foundTSD
-                if len(teInsertions[event][start].keys()) > 1 and int(teInsertions[event][start][foundTSD]['count']) == 1:
-                    #two or more TSD at this loci, some might be caused by sequencing error
-                    #we skip these keys if the coverage is 1 (singleton) for this case
-                    continue
-                TE_orient_foward  = teInsertions[event][start][foundTSD]['+'] if teInsertions[event][start][foundTSD].has_key('+') else 0
-                TE_orient_reverse = teInsertions[event][start][foundTSD]['-'] if teInsertions[event][start][foundTSD].has_key('-') else 0
-                TE_orient         = '+' if int(TE_orient_foward) > int(TE_orient_reverse) else '-'
-                total_count       = teInsertions[event][start][foundTSD]['count'] if teInsertions[event][start][foundTSD]['count'] else 0
-                left_count        = teInsertions[event][start][foundTSD]['left'] if teInsertions[event][start][foundTSD]['left'] else 0
-                right_count       = teInsertions[event][start][foundTSD]['right'] if teInsertions[event][start][foundTSD]['right'] else 0
-                reads             = ','.join(teInsertions_reads[event][start][foundTSD]['read'])
-                repeat_junction   = insertion_family(reads, read_repeat)
+                total_count += teInsertions[event][start][foundTSD]['count']
+                left_count  += teInsertions[event][start][foundTSD]['left']
+                right_count += teInsertions[event][start][foundTSD]['right']
+                TE_orient_foward  += teInsertions[event][start][foundTSD]['+']
+                TE_orient_reverse += teInsertions[event][start][foundTSD]['-']
+                tsd_count[foundTSD] = teInsertions[event][start][foundTSD]['count']
+                reads.extend(teInsertions_reads[event][start][foundTSD]['read'])
+            tsd_top = OrderedDict(sorted(tsd_count.items(), key=lambda x: x[1])).keys()[-1] 
+            TE_orient         = '+' if int(TE_orient_foward) > int(TE_orient_reverse) else '-'
+            repeat_junction   = insertion_family(','.join(reads), read_repeat)
 
-                #if len(teInsertions[event].keys()) > 1 and (int(left_count) == 0 or int(right_count) == 0):
-                    # two or more insertion found at one read cluster, some might be caused by sequencing or mapping error
-                    # we skip these keys if only have junction reads from one side
-                #    continue
-                #print 'junction: %s' %(repeat_junction)
-                #guess the repeat family of insertion
-                repeat_family     = 'NA'
-                if repeat_junction == repeat_supporting and repeat_junction != 'NA':
-                    repeat_family = repeat_junction
-                elif repeat_junction != repeat_supporting and repeat_junction != 'NA' and repeat_supporting != 'NA':
-                    repeat_family = '%s/%s' %(repeat_junction, repeat_supporting)
-                elif repeat_junction != 'NA':
-                    repeat_family = repeat_junction
-                elif repeat_supporting != 'NA':
-                    repeat_family = repeat_supporting
-                
-                #print left_count, right_count
-                print event, foundTSD, start, total_count, left_count, right_count, reads
-                if int(left_count) >= int(required_left_reads) or int(right_count) >= int(required_right_reads):
-                    coor       = int(start) + (len(foundTSD) - 1)
-                    coor_start = coor - (len(foundTSD) - 1)
-                    print >> READS, '%s\t%s:%s..%s\tJunction_reads\t%s' %(TE, usr_target, coor_start, coor, reads)
-                    print >> READS, '%s\t%s:%s..%s\tLeft_supporting_reads\t%s' %(TE, usr_target, coor_start, coor, left_reads)
-                    print >> READS, '%s\t%s:%s..%s\tRight_supporting_reads\t%s' %(TE, usr_target, coor_start, coor, right_reads)
-                    if int(left_count) > 0 and int(right_count) >0:
-                        print >> NONREF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, foundTSD, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
-                    elif int(left_count) == 1 or int(right_count) == 1:
-                        print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
+            #####information on each start position
+            start_both_junction = start_both_junction + 1 if (int(left_count) > 0 and int(right_count) > 0) else start_both_junction
+            start_collection.append([start, foundTSD, total_count, left_count, right_count, repeat_junction, ','.join(reads), total_supporting, left_supporting, right_supporting, left_reads, right_reads, repeat_supporting, TE_orient])
+
+        if len(teInsertions[event].keys()) > 1:
+            #two or more start found in one read cluster
+            if int(start_both_junction) == len(teInsertions[event].keys()):
+                #we keep all if they all supported by junction at both direction
+                cluster_collection.extend(start_collection)
+            else:
+                #not all supported at both end of junction
+                if int(start_both_junction) > 0:
+                    #we have tsd supported by junction at both direction
+                    #we only keep these supported by junction at both direction
+                    #even some supported by more than 1 junction reads, we thought due to sequence context
+                    #these insertions should have junction at both direction if they are true
+                    for start_it in start_collection:
+                        if int(start_it[3]) > 0 and int(start_it[4] > 0):
+                            cluster_collection.append(start_it)
+                else:
+                    #do not have tsd supported by junction at both direction
+                    #we keep the top one with higher number of junction reads
+                    top_start_it = []
+                    top_start_junction = 0
+                    for start_it in start_collection:
+                        if int(top_start_junction) < int(start_it[2]):
+                                top_start_junction = int(start_it[2])
+                                top_start_it       = start_it
+                    cluster_collection.append(top_start_it)
+        else:
+            #only one tsd found, just add to start_collection
+            cluster_collection.extend(start_collection)
+         
+        #[start, foundTSD, total_count, left_count, right_count, repeat_junction, ','.join(reads),
+        #total_supporting, left_supporting, right_supporting, left_reads, right_reads, repeat_supporting, TE_orient]
+        for insertion in cluster_collection:
+            #####insertion te name
+            r_supporting = insertion[12]
+            r_junction   = insertion[5]
+            repeat_family     = 'NA'
+            if r_junction == r_supporting and r_junction != 'NA':
+                repeat_family = r_junction
+            elif r_junction != r_supporting and r_junction != 'NA' and r_supporting != 'NA':
+                repeat_family = '%s/%s' %(r_junction, r_supporting)
+            elif r_junction != 'NA':
+                repeat_family = r_junction
+            elif r_supporting != 'NA':
+                repeat_family = r_supporting
+            
+            #####write to file
+            t_count = insertion[2]
+            l_count = insertion[3]
+            r_count = insertion[4]
+            i_start = insertion[0]
+            i_tsd   = insertion[1]
+            i_reads = insertion[6]
+            l_reads = insertion[10]
+            r_reads = insertion[11]
+            t_supporting = insertion[7]
+            l_supporting = insertion[8]
+            r_supporting = insertion[9]
+            t_orient     = insertion[13]
+            
+            if int(l_count) >= int(required_left_reads) or int(r_count) >= int(required_right_reads):
+                #at lease need one end have junction reads
+                coor       = int(i_start) + (len(i_tsd) - 1)
+                coor_start = coor - (len(i_tsd) - 1)
+                print >> READS, '%s\t%s:%s..%s\tJunction_reads\t%s' %(TE, usr_target, coor_start, coor, i_reads)
+                print >> READS, '%s\t%s:%s..%s\tLeft_supporting_reads\t%s' %(TE, usr_target, coor_start, coor, l_reads)
+                print >> READS, '%s\t%s:%s..%s\tRight_supporting_reads\t%s' %(TE, usr_target, coor_start, coor, r_reads)
+                if int(l_count) > 0 and int(r_count) >0:
+                    #both ends have junction reads
+                    print >> NONREF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, i_tsd, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                elif int(l_count) == 1 or int(r_count) == 1:
+                    #only one end with junction and have only one reads
+                    print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                else:
+                    #only have end with junction and more than one reads 
+                    if int(r_supporting) >= 2 and int(l_supporting) >= 2:
+                        #only one end with junction but both end with supporting reads
+                        print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
                     else:
-                        if int(right_supporting) >= 2 and int(left_supporting) >= 2:
-                            print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
-                        else:
-                            print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, TE_orient, total_count, right_count, left_count, total_supporting, right_supporting, left_supporting)
+                        #only one end with junction and only one end with supporting reads
+                        print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+            else:
+                #no junction reads
+                pass  
 
 
 def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
