@@ -219,20 +219,31 @@ def write_output(result, read_repeat, usr_target, exper, TE, required_reads, req
                 if int(l_count) > 0 and int(r_count) >0:
                     #both ends have junction reads
                     print >> NONREF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, i_tsd, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
-                elif int(l_count) == 1 or int(r_count) == 1:
-                    #only one end with junction and have only one reads
-                    print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
                 else:
-                    #only have end with junction and more than one reads 
-                    if int(r_supporting) >= 2 and int(l_supporting) >= 2:
+                    #only have end with junction 
+                    if int(r_supporting) >= 1 and int(l_supporting) >= 1:
                         #only one end with junction but both end with supporting reads
                         print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
                     else:
                         #only one end with junction and only one end with supporting reads
-                        print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                        if (int(r_supporting) >= 1 and int(l_count) >= 1) or (int(l_supporting) >= 1 and int(r_count) >= 1):
+                            print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                        elif int(t_supporting) + int(t_count) == 1:
+                            #singleton
+                            print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                        else:
+                            #insufficient
+                            print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
             else:
                 #no junction reads
-                pass  
+                if int(r_supporting) >= 1 and int(l_supporting) >= 1:
+                    #no junction reads, but both end with supporting reads
+                    print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                elif int(t_supporting) == 1:
+                    print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                else:
+                    print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                #pass
 
 
 def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
