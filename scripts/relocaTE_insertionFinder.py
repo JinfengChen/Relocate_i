@@ -335,6 +335,35 @@ def existingTE(infile, existingTE_inf, existingTE_found):
                         existingTE_found[line]['start']= 0
                         existingTE_found[line]['end']  = 0
 
+def existingTE_RM(infile, existingTE_inf):
+    r_end = re.compile(r'\((\d+)\)')
+    with open (infile, 'r') as filehd:
+        for line in filehd:
+            line = line.rstrip()
+            if len(line) > 2: 
+                unit = re.split(r'\s+',line)
+                #print line
+                #print unit[5], unit[9], unit[12], unit[13], unit[14]
+                if unit[9] == '+':
+                    if int(unit[12]) == 1:
+                        existingTE_inf[unit[10]]['start'][int(unit[6])] = 1
+                        #print unit[10], 'start', unit[6]
+                    if len(unit[14]) == 3:
+                        unit[14] =re.sub(r'\(|\)', '', unit[14])
+                        if int(unit[14]) == 0:
+                            existingTE_inf[unit[10]]['end'][int(unit[7])] = 1
+                            #print unit[10], 'end', unit[7]
+                elif unit[9] == 'C':
+                    if len(unit[12]) == 3:
+                        unit[12] =re.sub(r'\(|\)', '', unit[12])
+                        if int(unit[12]) == 0:
+                            existingTE_inf[unit[10]]['start'][int(unit[6])] = 1
+                            #print unit[10], 'start', unit[6]
+                    if int(unit[14]) == 1:
+                        existingTE_inf[unit[10]]['end'][int(unit[7])] = 1
+                        #print unit[10], 'end', unit[7]
+ 
+
 def complement(seq):
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
     bases = list(seq)
@@ -397,25 +426,25 @@ def TSD_check(event, seq, start, real_name, read_repeat, name, TSD, strand, teIn
             pos       = 'right'
             TE_orient = '-' if name[-1] == '5' else '+'
             TSD_start = int(start)
-    #print '%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
+    print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
         if pos == 'left':
             tir1_end = int(start) + len(seq)
-            #print 'tir1: %s' %(tir1_end)
+            print 'tir1: %s' %(tir1_end)
         elif pos == 'right':
             tir2_end = int(start) - 1
-            #print 'tir2: %s' %(tir2_end)
+            print 'tir2: %s' %(tir2_end)
         if tir1_end > 0 and existingTE_inf[repeat]['start'].has_key(tir1_end):
             te_id = existingTE_inf[repeat]['start'][tir1_end]
-            existingTE_found[te_id]['start'] += 1
-            #print 'tir1'
+            #existingTE_found[te_id]['start'] += 1
+            print 'tir1'
         elif tir2_end > 0 and existingTE_inf[repeat]['end'].has_key(tir2_end):
             te_id = existingTE_inf[repeat]['end'][tir2_end]
-            existingTE_found[te_id]['end'] += 1
-            #print 'tir2'
+            #existingTE_found[te_id]['end'] += 1
+            print 'tir2'
         else:
-            #print 'not match'
+            print 'not match'
             ##non reference insertions
             teInsertions[event][TSD_start][TSD_seq]['count']   += 1   ## total junction reads
             teInsertions[event][TSD_start][TSD_seq][pos]       += 1   ## right/left junction reads
@@ -604,8 +633,12 @@ def main():
     teSupportingReads    = defaultdict(lambda : list())
 
     #read existing TE from file
+    r_te = re.compile(r'repeatmasker|rm|\.out', re.IGNORECASE)
     if os.path.isfile(existing_TE) and os.path.getsize(existing_TE) > 0:
-        existingTE(existing_TE, existingTE_inf, existingTE_found)
+        if r_te.search(existing_TE):
+            existingTE_RM(existing_TE, existingTE_inf)
+        else:
+            existingTE(existing_TE, existingTE_inf, existingTE_found)
     else:
         print 'Existing TE file does not exists or zero size'
 

@@ -46,8 +46,6 @@ def main():
     try:
         os.path.isfile(args.bam) and os.path.isfile(args.te_fasta) and os.path.isfile(args.genome_fasta)
     except:
-        pass
-    else:
         try:
             os.path.exists(args.fq_dir) and os.path.isfile(args.te_fasta) and os.path.isfile(args.genome_fasta)
         except:
@@ -63,8 +61,8 @@ def main():
     fastq_dir    = ''
     
     try: 
-        if os.path.isfile(args.bam):
-            bam  = os.path.abspath(args.bam)
+        os.path.isfile(args.bam)
+        bam  = os.path.abspath(args.bam)
     except:
         try:
             if os.path.abspath(args.fq_dir):
@@ -134,8 +132,31 @@ def main():
             step2_file = '%s/shellscripts/step_2_not_needed_fq_already_converted_2_fa' %(args.outdir)
             writefile(step2_file, '')        
     elif mode == 'bam':
-        print 'Add module of obtaining reads from bam then prepare as fa files'
-    
+        #print 'Add module of obtaining reads from bam then prepare as fa files'
+        cmd_step2 = []
+        fastq_dir = '%s/repeat/fastq' %(args.outdir)
+        createdir(fastq_dir)
+        subbam = '%s/%s.subset.bam' %(fastq_dir, os.path.splitext(os.path.split(bam)[1])[0])
+        fq1 = '%s/%s_1.fq' %(fastq_dir, os.path.splitext(os.path.split(bam)[1])[0])
+        fq2 = '%s/%s_2.fq' %(fastq_dir, os.path.splitext(os.path.split(bam)[1])[0])
+        fa1 = '%s.fa' %(os.path.splitext(fq1)[0])
+        fa2 = '%s.fa' %(os.path.splitext(fq2)[0])
+        fastas[fa1] = fq1
+        fastas[fa2] = fq2
+        cmd_step2.append('samtools view -h %s | awk \'$5<60\' | samtools view -Shb - | samtools sort -n - %s' %(bam, os.path.splitext(subbam)[0]))
+        cmd_step2.append('bedtools bamtofastq -i %s -fq %s -fq2 %s' %(subbam, fq1, fq2))
+        cmd_step2.append('%s/relocaTE_fq2fa.pl %s %s' %(RelocaTE_bin, fq1, fa1))
+        cmd_step2.append('%s/relocaTE_fq2fa.pl %s %s' %(RelocaTE_bin, fq2, fa2))
+        step2_flag = 0
+        if not os.path.isfile(fa1) and not os.path.isfile(fa2):
+            createdir('%s/shellscripts/step_2' %(args.outdir))
+            step2_file = '%s/shellscripts/step_2/0.bam2fa.sh' %(args.outdir)
+            shells.append('sh %s' %(step2_file))
+            writefile(step2_file, '\n'.join(cmd_step2))
+        else:
+            step2_file = '%s/shellscripts/step_2_not_needed_fq_already_converted_2_fa' %(args.outdir)
+            writefile(step2_file, '')
+
     #step3 blat fasta to repeat
     step3_count = 0
     for fa in sorted(fastas.keys()):
@@ -149,7 +170,7 @@ def main():
         if args.fastmap is not None:
             blat = 'blat -minScore=10 -tileSize=7 -fastMap %s %s %s 1>> %s' %(te_fasta, fa, blatout, blatstd)
         flank= '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fa_prefix)
-        trim = 'perl %s/relocaTE_trim.py %s %s 10 0 > %s' %(RelocaTE_bin, blatout, fq, flank)
+        trim = 'python %s/relocaTE_trim.py %s %s 10 0 > %s' %(RelocaTE_bin, blatout, fq, flank)
         step3_file = '%s/shellscripts/step_3/%s.te_repeat.blat.sh' %(args.outdir, step3_count)
         shells.append('sh %s' %(step3_file))
         step3_cmds = '%s\n%s' %(blat, trim)
@@ -162,7 +183,7 @@ def main():
     createdir('%s/shellscripts/step_4' %(args.outdir))
     step4_file= '%s/shellscripts/step_4/step_4.%s.repeat.align.sh' %(args.outdir, ref)
     shells.append('sh %s' %(step4_file))
-    step4_cmd = 'perl %s/relocaTE_align.py %s %s/repeat %s %s %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, fastq_dir, args.outdir)
+    step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, fastq_dir, args.outdir)
     writefile(step4_file, step4_cmd)
     
     #step5 find insertions
@@ -170,7 +191,7 @@ def main():
     createdir('%s/shellscripts/step_5' %(args.outdir))
     step5_count = 0
     for chrs in ids:
-        step5_cmd = 'perl %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag)
+        step5_cmd = 'python %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag)
         step5_file= '%s/shellscripts/step_5/%s.repeat.findSites.sh' %(args.outdir, step5_count)
         shells.append('sh %s' %(step5_file))
         writefile(step5_file, step5_cmd)
