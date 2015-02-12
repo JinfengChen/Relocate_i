@@ -257,11 +257,15 @@ def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, te
     #teReadClusters_depth[event]['read_inf']['depth'][i] += 1 
     for cluster in sorted(teReadClusters.keys(), key=int):
         read_total = teReadClusters_count[cluster]['read_count']
-        TSD_len = 0 
+        chro    = teReadClusters[cluster]['read_inf']['seq']['chr']
+        TSD_len = 0
+        print 'cluster%s: %s' %(cluster, read_total) 
         for chrs_pos in sorted(teReadClusters_depth[cluster]['read_inf']['depth'].keys(), key=int):
             depth = teReadClusters_depth[cluster]['read_inf']['depth'][chrs_pos]
-            if float(depth) >= 0.8*float(read_total):
+            print depth
+            if float(depth) >= 0.6*float(read_total):
                 TSD_len += 1
+        print 'TSD_len: %s' %(str(TSD_len))
         if TSD_len > 0:
             TSD = '.'*TSD_len
             for name in teReadClusters[cluster]['read_inf'].keys():
@@ -270,17 +274,27 @@ def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, te
                 start  = teReadClusters[cluster]['read_inf'][name]['start']
                 strand = teReadClusters[cluster]['read_inf'][name]['strand']
                 #print '%s\t%s\t%s\t%s\t%s' %(cluster, start, name, TSD, strand)
-                TSD_check(cluster, seq, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
+                TSD_check(cluster, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
             del teReadClusters[cluster]
             del teReadClusters_count[cluster]
             del teReadClusters_depth[cluster]
         else:
-            pass
+            #pass
             #what if we can not find TSD? still could be insertions
+            TSD = 'UKN'
+            for name in teReadClusters[cluster]['read_inf'].keys():
+                real_name = r.search(name).groups(0)[0] if r.search(name) else ''
+                seq    = teReadClusters[cluster]['read_inf'][name]['seq']
+                start  = teReadClusters[cluster]['read_inf'][name]['start']
+                strand = teReadClusters[cluster]['read_inf'][name]['strand']
+                TSD_check(cluster, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
+            del teReadClusters[cluster]
+            del teReadClusters_count[cluster]
+            del teReadClusters_depth[cluster]
 
 
-def align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads):
-    range_allowance = 500
+def align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads):
+    range_allowance = 1000
     padded_start    = bin_ins[0] - range_allowance
     padded_end      = bin_ins[-1] + range_allowance 
     #insertions
@@ -291,7 +305,7 @@ def align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, start, end
         if r.search(name):
             real_name = r.search(name).groups(0)[0]
             if not r_tsd.search(TSD):
-                TSD_check(count, seq, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
+                TSD_check(count, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
             else:
                 calculate_cluster_depth(count, seq, start, name, strand, teReadClusters, teReadClusters_count, teReadClusters_depth)
         elif not r.search(name) and not record.is_paired:
@@ -306,7 +320,7 @@ def align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, start, end
         if r.search(name):
             real_name = r.search(name).groups(0)[0]
             if not r_tsd.search(TSD):
-                TSD_check(count, seq, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
+                TSD_check(count, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
             else:
                 calculate_cluster_depth(count, seq, start, name, strand, teReadClusters, teReadClusters_count, teReadClusters_depth)
         elif not r.search(name) and not record.is_paired:
@@ -337,6 +351,7 @@ def existingTE(infile, existingTE_inf, existingTE_found):
 
 def existingTE_RM(infile, existingTE_inf):
     r_end = re.compile(r'\((\d+)\)')
+    ofile_RM = open('existingTE.bed', 'w')
     with open (infile, 'r') as filehd:
         for line in filehd:
             line = line.rstrip()
@@ -346,21 +361,29 @@ def existingTE_RM(infile, existingTE_inf):
                 #print unit[5], unit[9], unit[12], unit[13], unit[14]
                 if unit[9] == '+':
                     if int(unit[12]) == 1:
-                        existingTE_inf[unit[10]]['start'][int(unit[6])] = 1
+                        for i in range(int(unit[6])-1, int(unit[6])+1):
+                            existingTE_inf[unit[5]]['start'][i] = 1
+                        print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-10), str(int(unit[6])+10), unit[11],unit[6],unit[7], '1', '+')
                         #print unit[10], 'start', unit[6]
                     if len(unit[14]) == 3:
                         unit[14] =re.sub(r'\(|\)', '', unit[14])
                         if int(unit[14]) == 0:
-                            existingTE_inf[unit[10]]['end'][int(unit[7])] = 1
+                            for i in range(int(unit[7])-1, int(unit[7])+1):
+                                existingTE_inf[unit[5]]['end'][i] = 1
+                            print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-10), str(int(unit[7])+10), unit[11],unit[6],unit[7], '1', '+')
                             #print unit[10], 'end', unit[7]
                 elif unit[9] == 'C':
                     if len(unit[12]) == 3:
                         unit[12] =re.sub(r'\(|\)', '', unit[12])
                         if int(unit[12]) == 0:
-                            existingTE_inf[unit[10]]['start'][int(unit[6])] = 1
+                            for i in range(int(unit[6])-1, int(unit[6])+1):
+                                existingTE_inf[unit[5]]['start'][int(unit[6])] = 1
+                            print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-10), str(int(unit[6])+10), unit[11],unit[6],unit[7],'1', '-')
                             #print unit[10], 'start', unit[6]
                     if int(unit[14]) == 1:
-                        existingTE_inf[unit[10]]['end'][int(unit[7])] = 1
+                        for i in range(int(unit[6])-1, int(unit[6])+1):
+                            existingTE_inf[unit[5]]['end'][int(unit[7])] = 1
+                        print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-10), str(int(unit[7])+10), unit[11],unit[6],unit[7], '1', '-')
                         #print unit[10], 'end', unit[7]
  
 
@@ -382,7 +405,7 @@ def calculate_cluster_depth(event, seq, start, name, strand, teReadClusters, teR
     for i in range(int(start), int(start)+len(seq)):
         teReadClusters_depth[event]['read_inf']['depth'][i] += 1
 
-def TSD_check(event, seq, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
+def TSD_check(event, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
     ##TSD already specified by usr, not unknown
     ##seq is entire trimmd read, not just the TSD portion of the read
     ##start is the first postition of the entire read match to ref
@@ -435,12 +458,12 @@ def TSD_check(event, seq, start, real_name, read_repeat, name, TSD, strand, teIn
         elif pos == 'right':
             tir2_end = int(start) - 1
             print 'tir2: %s' %(tir2_end)
-        if tir1_end > 0 and existingTE_inf[repeat]['start'].has_key(tir1_end):
-            te_id = existingTE_inf[repeat]['start'][tir1_end]
+        if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
+            te_id = existingTE_inf[chro]['start'][tir1_end]
             #existingTE_found[te_id]['start'] += 1
             print 'tir1'
-        elif tir2_end > 0 and existingTE_inf[repeat]['end'].has_key(tir2_end):
-            te_id = existingTE_inf[repeat]['end'][tir2_end]
+        elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
+            te_id = existingTE_inf[chro]['end'][tir2_end]
             #existingTE_found[te_id]['end'] += 1
             print 'tir2'
         else:
@@ -470,6 +493,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
 
     ref  = 'None' if target == 'ALL' else target
     fsam = pysam.AlignmentFile(align_file, 'rb')
+    rnames = fsam.references
     for record in fsam.fetch(reference=ref, until_eof = True):
         if not record.is_unmapped:
             name   = record.query_name
@@ -480,6 +504,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             seq    = record.query_sequence
             tag    = record.tags if record.tags else []
             length = len(seq)
+            chro   = rnames[record.reference_id]
             end    = int(start) + int(length) - 1 #should not allowed for indel or softclip
             strand = ''
             # flag is 0 is read if read is unpaired and mapped to plus strand
@@ -494,15 +519,17 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             # filter low quality mapping reads: 
             # 1. paired-end reads at least have one reads unique mapped (MAPQ set to 0 for both reads if both are repeat, else should be > 0 at least one unique mapped)
             # 2. unpaired reads should unique mapped, no gap, mismatch <= 3 and no suboptimal alignment
-            #print 'before: %s\t%s\t%s' %(name, count, bin_ins)
+            print 'before: %s\t%s\t%s' %(name, count, bin_ins)
             #if record.is_proper_pair and (int(MAPQ) >= 29 or tags['XT'] == 'U'):
             if record.is_proper_pair and int(MAPQ) > 0:
-                bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
+                bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             elif not record.is_paired:
                 #if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['XM']) <= 3 and int(tags['X1']) == 0:
                 if tags['XT'] == 'U' and int(tags['XO']) == 0 and (int(tags['XM']) <= 3 or int(tags['X1']) == 0):
-                    bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
-            #print 'after: %s\t%s\t%s' %(name, count, bin_ins)
+                #if tags['XT'] == 'U':
+                    bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
+            teReadClusters[count]['read_inf']['seq']['chr'] = chro
+            print 'after: %s\t%s\t%s' %(name, count, bin_ins)
 
     ###TSD not given we infer from read depth
     if r_tsd.search(TSD):

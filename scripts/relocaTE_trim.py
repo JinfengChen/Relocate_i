@@ -187,7 +187,8 @@ def main():
                     #print header, seq, qual
                     #print 'check2: %s\t%s\t%s'  %(str(tStart), str((length - (match + mismatch))), str((mismatch/(match + mismatch))))
                     ##query read overlaps 5' end of database TE & trimmed seq > cutoff
-                    if tStart == 0 and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
+                    #int(start) <= 2 or int(end) >= int(length) - 3, we need the reads mapped boundary to align with te
+                    if tStart == 0 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
                         tS = int(tStart) + 1
                         tE = int(tEnd) + 1
                         qS = int(start) + 1
@@ -216,7 +217,7 @@ def main():
                             print >> ofile_rr, '%s\t%s' %(rl_name, tName)
                             print >> ofile_te5, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
                     #query read overlaps 3' end of database TE & trimmed seq > cutoff
-                    elif tEnd == tLen - 1 and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
+                    elif tEnd == tLen - 1 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
                         tS = int(tStart) + 1
                         tE = int(tEnd) + 1
                         qS = int(start) + 1
