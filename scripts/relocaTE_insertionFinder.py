@@ -539,8 +539,8 @@ def existingTE(infile, existingTE_inf, existingTE_found):
                         existingTE_found[line]['end']  = 0
 
 
-def existingTE_RM_ALL(infile, existingTE_inf):
-    ofile_RM = open('existingTE.bed', 'w')
+def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
+    ofile_RM = open('%s/existingTE.bed' %(top_dir), 'w')
     with open (infile, 'r') as filehd:
         for line in filehd:
             line = line.rstrip()
@@ -568,9 +568,9 @@ def existingTE_RM_ALL(infile, existingTE_inf):
                     #print unit[10], 'end', unit[7]
 
 
-def existingTE_RM(infile, existingTE_inf):
+def existingTE_RM(top_dir, infile, existingTE_inf):
     r_end = re.compile(r'\((\d+)\)')
-    ofile_RM = open('existingTE.bed', 'w')
+    ofile_RM = open('%s/existingTE.bed' %(top_dir), 'w')
     with open (infile, 'r') as filehd:
         for line in filehd:
             line = line.rstrip()
@@ -953,13 +953,14 @@ def main():
     teReadClusters_depth = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : int()))))
     teSupportingReads    = defaultdict(lambda : list())
 
+    top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
     #read existing TE from file
     r_te = re.compile(r'repeatmasker|rm|\.out', re.IGNORECASE)
     if os.path.isfile(existing_TE) and os.path.getsize(existing_TE) > 0:
         if r_te.search(existing_TE):
-            existingTE_RM_ALL(existing_TE, existingTE_inf)
+            existingTE_RM_ALL('/'.join(top_dir), existing_TE, existingTE_inf)
         else:
-            existingTE(existing_TE, existingTE_inf, existingTE_found)
+            existingTE('/'.join(top_dir), existing_TE, existingTE_inf, existingTE_found)
     else:
         print 'Existing TE file does not exists or zero size'
 
@@ -984,7 +985,7 @@ def main():
     #    exit(2)
 
     ##read -> repeat relation
-    top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
+    #top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
     result  = '%s/results' %('/'.join(top_dir))
     read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
     read_repeat = read_repeat_name(read_repeat_files)
