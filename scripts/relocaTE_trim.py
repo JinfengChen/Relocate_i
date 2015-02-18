@@ -214,7 +214,7 @@ def main():
                             header = '%s%s' %(seq_id, seq_desc)
                         #print 'trimmed: %s %s' %(trimmed_seq, str(end))
                         if len(trimmed_seq) >= len_cutoff:
-                            print >> ofile_rr, '%s\t%s' %(rl_name, tName)
+                            print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand)
                             print >> ofile_te5, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
                     #query read overlaps 3' end of database TE & trimmed seq > cutoff
                     elif tEnd == tLen - 1 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
@@ -239,7 +239,7 @@ def main():
                             seq_id   = '%s:start:3' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
                         if len(trimmed_seq) >= len_cutoff:
-                            print >> ofile_rr, '%s\t%s' %(rl_name, tName)
+                            print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand)
                             print >> ofile_te3, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
                     #query read overlaps internal of database TE, no need to trim. These reads pairs will be used as supporting reads
                     #in relocate_align, we get the reads in trimmed files and their pairs.
@@ -250,7 +250,7 @@ def main():
                         seq_desc = ''
                         seq_id   = '%s:middle' %(seq_id)
                         header = '%s%s' %(seq_id, seq_desc)
-                        print >> ofile_rr, '%s\t%s' %(rl_name, tName) 
+                        print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand) 
                     ##trimmed reads
                     if len(trimmed_seq) >= len_cutoff:
                         print '@%s\n%s\n%s\n%s' %(header, trimmed_seq, qualh, trimmed_qual)
