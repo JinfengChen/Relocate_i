@@ -58,30 +58,24 @@ def parse_align_blat(infile, tandem):
             tStart   = int(unit[15])
             #get all values into 1st base = 0 postion notation
             tEnd     = int(unit[16]) - 1 
+            boundary = 1 if int(qStart) == 0 or int(qEnd) + 1 == int(qLen) else 0 
             addRecord = 0
+            #print qName, qStart, qEnd, match, boundary
             if coord.has_key(qName):
-                if strand == coord[qName]['strand']:
-                    ##if there is are tandem insertions, theses reads
-                    ##will call many false insertions events.
-                    ##if on the same strand, the matches are not likely to overlap,
-                    ##the two regions would be separated by mismatches or gaps if they were not
-                    ##tandem insetions
-                    print >> ofile, qName
-                    qStart = qStart if qStart < int(coord[qName]['start']) else int(coord[qName]['start'])
-                    qEnd   = qEnd if qEnd > int(coord[qName]['end']) else int(coord[qName]['end'])
-                    tStart = tStart if tStart < int(coord[qName]['tStart']) else int(coord[qName]['tStart'])
-                    tEnd   = tEnd if tEnd > int(coord[qName]['tEnd']) else int(coord[qName]['tEnd'])
-                    match  = qLen if (int(coord[qName]['match']) + int(match)) > int(qLen) else int(coord[qName]['match']) + int(match)
-                    addRecord = 1
-                else:
-                    ##keep the best match to TE
-                    if int(coord[qName]['match']) >= match:
-                        addRecord = 0
-                    else:
+                ##keep the best match to TE
+                if int(boundary) > int(coord[qName]['boundary']):
                         addRecord = 1
+                elif int(boundary) == int(coord[qName]['boundary']):
+                    if int(match) > int(coord[qName]['match']):
+                        addRecord = 1
+                    else:
+                        addRecord = 0
+                else:
+                    addRecord = 0
             else:
                 addRecord = 1
 
+            #print qName, qStart, qEnd, match, addRecord
             if addRecord == 1:
                 coord[qName]['match']    = match
                 coord[qName]['len']      = qLen
@@ -93,6 +87,8 @@ def parse_align_blat(infile, tandem):
                 coord[qName]['tName']    = tName
                 coord[qName]['tStart']   = tStart
                 coord[qName]['tEnd']     = tEnd
+                coord[qName]['boundary'] = boundary
+                #print qName, qStart, qEnd
     ofile.close()
     return coord
  
@@ -184,7 +180,7 @@ def main():
                     #want to cut and keep anything not matching to database TE
                     trimmed_seq  = ''
                     trimmed_qual = ''
-                    #print header, seq, qual
+                    #print header, tName, tStart, tEnd
                     #print 'check2: %s\t%s\t%s'  %(str(tStart), str((length - (match + mismatch))), str((mismatch/(match + mismatch))))
                     ##query read overlaps 5' end of database TE & trimmed seq > cutoff
                     #int(start) <= 2 or int(end) >= int(length) - 3, we need the reads mapped boundary to align with te
@@ -212,7 +208,7 @@ def main():
                             seq_desc = ''
                             seq_id   = '%s:end:5' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
-                        #print 'trimmed: %s %s' %(trimmed_seq, str(end))
+                        #print '1: trimmed: %s %s' %(trimmed_seq, str(end))
                         if len(trimmed_seq) >= len_cutoff:
                             print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand)
                             print >> ofile_te5, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
@@ -238,6 +234,7 @@ def main():
                             seq_desc = ''
                             seq_id   = '%s:start:3' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
+                        #print '2: trimmed: %s %s' %(trimmed_seq, str(end))
                         if len(trimmed_seq) >= len_cutoff:
                             print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand)
                             print >> ofile_te3, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
@@ -251,6 +248,7 @@ def main():
                         seq_id   = '%s:middle' %(seq_id)
                         header = '%s%s' %(seq_id, seq_desc)
                         print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand) 
+                        #print '3: trimmed: %s %s' %(trimmed_seq, str(end))
                     ##trimmed reads
                     if len(trimmed_seq) >= len_cutoff:
                         print '@%s\n%s\n%s\n%s' %(header, trimmed_seq, qualh, trimmed_qual)

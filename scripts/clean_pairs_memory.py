@@ -9,7 +9,7 @@ import argparse
 def usage():
     test="name"
     message='''
-python clean_pairs_memory.py --1 fastq1 --2 fastq2 --repeat path/te_containing_fq --fq_dir original_fq_dir > unPaired.fq
+python clean_pairs_memory.py --1 fastq1 --2 fastq2 --repeat path/te_containing_fq --fq_dir original_fq_dir --seqtk pathtoseqtk > unPaired.fq
 
 Takes pairs of fastq files, which is trimmed from repeat blat results seperately, and find their mates in each other, in TE_containing fastqs and original fastqs.
 *.matched: contain reads that have mates in eigher trimmed fastq or in original fastq (whether includes these in TE_containing need to test).
@@ -152,7 +152,7 @@ def match_trimmed(fq1, fq2, fq1_match, fq2_match, fq_unPaired):
     #return dictionary which includes unpaired middles and unpaired end/start
     return (fq1_dict, fq2_dict)
 
-def match_support(fq1_dict, fq2_0, fq2_te, fq1_match, fq2_match, fq_unPaired, fq1_id_temp, fq2_0_temp):
+def match_support(fq1_dict, fq2_0, fq2_te, fq1_match, fq2_match, fq_unPaired, fq1_id_temp, fq2_0_temp, seqtk):
     ofile1 = open(fq1_match, 'a')
     ofile2 = open(fq2_match, 'a')
     ofile3 = open(fq_unPaired, 'a')
@@ -188,7 +188,7 @@ def match_support(fq1_dict, fq2_0, fq2_te, fq1_match, fq2_match, fq_unPaired, fq
     #get subset of fastq from original fastq
     #cmd = 'seqtk subseq %s %s > %s' %(fq2_0, fq1_id_temp, fq2_0_temp)
     #print cmd
-    os.system('seqtk subseq %s %s > %s' %(fq2_0, fq1_id_temp, fq2_0_temp))
+    os.system('%s subseq %s %s > %s' %(seqtk, fq2_0, fq1_id_temp, fq2_0_temp))
     fq2_0_temp_dict = parse_fastq_default(fq2_0_temp)
     os.system('rm %s %s' %(fq1_id_temp, fq2_0_temp))
 
@@ -219,6 +219,7 @@ def main():
     parser.add_argument('-2', '--fq2')
     parser.add_argument('-r', '--repeat')
     parser.add_argument('-f', '--fq_dir')
+    parser.add_argument('-s', '--seqtk')
     parser.add_argument('-v', dest='verbose', action='store_true')
     args = parser.parse_args()
     try:
@@ -247,11 +248,11 @@ def main():
     fq1_id_temp = '%s.fq1_id_temp.list' %(os.path.splitext(args.fq1)[0])
     fq2_0_temp  = '%s.fq2_0_temp.fq' %(os.path.splitext(args.fq2)[0])
     #print '%s\n%s' %(fq1_id_temp, fq2_0_temp)
-    match_support(fq1_dict, fq2_0, fq2_te, fq1_match, fq2_match, fq_unPaired, fq1_id_temp, fq2_0_temp)
+    match_support(fq1_dict, fq2_0, fq2_te, fq1_match, fq2_match, fq_unPaired, fq1_id_temp, fq2_0_temp, args.seqtk)
     fq2_id_temp = '%s.fq2_id_temp.list' %(os.path.splitext(args.fq2)[0])
     fq1_0_temp  = '%s.fq1_0_temp.fq' %(os.path.splitext(args.fq1)[0])
     #print '%s\n%s' %(fq2_id_temp, fq1_0_temp)
-    match_support(fq2_dict, fq1_0, fq1_te, fq2_match, fq1_match, fq_unPaired, fq2_id_temp, fq1_0_temp)
+    match_support(fq2_dict, fq1_0, fq1_te, fq2_match, fq1_match, fq_unPaired, fq2_id_temp, fq1_0_temp, args.seqtk)
 
  
 if __name__ == '__main__':

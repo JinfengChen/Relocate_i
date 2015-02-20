@@ -83,6 +83,45 @@ def main():
         args.outdir = os.path.abspath(args.outdir)
         createdir(args.outdir)
 
+    samtools = ''
+    bedtools = ''
+    bwa      = ''
+    
+    try:
+        subprocess.check_output('which samtools', shell=True)
+        samtools = subprocess.check_output('which samtools', shell=True)
+        samtools = re.sub(r'\n', '', samtools)
+    except:
+        samtools = '/opt/samtools-0.1.16/samtools'
+
+    try:
+        subprocess.check_output('which bedtools', shell=True)
+        bedtools = subprocess.check_output('which bedtools', shell=True)
+        bedtools = re.sub(r'\n', '', bedtools)
+    except:
+        bedtools = '/opt/bedtools/2.17.0-25-g7b42b3b/bin//bedtools'
+
+    try:
+        subprocess.check_output('which bwa', shell=True)
+        bwa = subprocess.check_output('which bwa', shell=True)
+        bwa = re.sub(r'\n', '', bwa)
+    except:
+        bwa = '/opt/tyler/bin/bwa'
+ 
+    try:
+        subprocess.check_output('which blat', shell=True)
+        blat = subprocess.check_output('which blat', shell=True)
+        blat = re.sub(r'\n', '', blat)
+    except:
+        blat = '/usr/local/bin/blat'   
+
+    #MSU_r7.fa.bwt
+    if not os.path.isfile('%s.bwt' %(reference)):
+        print 'Reference need to be indexed by bwa: %s' %(reference)
+        exit()
+ 
+    run_std = '%s/run.std' %(args.outdir)
+
     writefile('%s/regex.txt' %(args.outdir), '_1\t_2\t.unPaired\tUNK')
     createdir('%s/shellscripts' %(args.outdir))
     createdir('%s/repeat' %(args.outdir))
@@ -105,7 +144,7 @@ def main():
         createdir('%s/shellscripts/step_0' %(args.outdir))
         step0_file = '%s/shellscripts/step_0/step_0.existingTE_blat.sh' %(args.outdir)
         shells.append('sh %s' %(step0_file))
-        existingTE_blat = 'blat %s %s %s/existingTE.blatout 1> %s/existingTE.blat.stdout' %(reference, te_fasta, args.outdir, args.outdir)
+        existingTE_blat = '%s %s %s %s/existingTE.blatout 1> %s/existingTE.blat.stdout' %(blat, reference, te_fasta, args.outdir, args.outdir)
         reference_ins_flag = '%s/existingTE.blatout' %(args.outdir)
         writefile(step0_file, existingTE_blat)
 
@@ -143,8 +182,10 @@ def main():
         fa2 = '%s.fa' %(os.path.splitext(fq2)[0])
         fastas[fa1] = fq1
         fastas[fa2] = fq2
-        cmd_step2.append('samtools view -h %s | awk \'$5<60\' | samtools view -Shb - | samtools sort -n - %s' %(bam, os.path.splitext(subbam)[0]))
-        cmd_step2.append('bedtools bamtofastq -i %s -fq %s -fq2 %s' %(subbam, fq1, fq2))
+        if not os.path.isfile(subbam):
+            cmd_step2.append('%s view -h %s | awk \'$5<60\' | samtools view -Shb - | samtools sort -m 500000000 -n - %s 2> %s' %(samtools, bam, os.path.splitext(subbam)[0], run_std))
+        if not os.path.isfile(fq1) and not os.path.isfile(fq2):
+            cmd_step2.append('%s bamtofastq -i %s -fq %s -fq2 %s 2> %s' %(bedtools, subbam, fq1, fq2, run_std))
         cmd_step2.append('%s/relocaTE_fq2fa.pl %s %s' %(RelocaTE_bin, fq1, fa1))
         cmd_step2.append('%s/relocaTE_fq2fa.pl %s %s' %(RelocaTE_bin, fq2, fa2))
         step2_flag = 0
@@ -166,16 +207,17 @@ def main():
         fa_prefix = os.path.split(os.path.splitext(fa)[0])[1]
         blatout = '%s/repeat/blat_output/%s.te_repeat.blatout' %(args.outdir, fa_prefix)
         blatstd = '%s/repeat/blat_output/blat.out' %(args.outdir)
-        blat = 'blat -minScore=10 -tileSize=7 %s %s %s 1>> %s' %(te_fasta, fa, blatout, blatstd)
-        if args.fastmap is not None:
-            blat = 'blat -minScore=10 -tileSize=7 -fastMap %s %s %s 1>> %s' %(te_fasta, fa, blatout, blatstd)
+        blatcmd = '%s -minScore=10 -tileSize=7 %s %s %s 1>>%s 2>>%s' %(blat ,te_fasta, fa, blatout, blatstd, blatstd)
+        #if args.fastmap is not None:
+        #    blat = 'blat -minScore=10 -tileSize=7 -fastMap %s %s %s 1>> %s' %(te_fasta, fa, blatout, blatstd)
         flank= '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fa_prefix)
-        trim = 'python %s/relocaTE_trim.py %s %s 10 0 > %s' %(RelocaTE_bin, blatout, fq, flank)
+        trim = 'python %s/relocaTE_trim.py %s %s 10 1 > %s' %(RelocaTE_bin, blatout, fq, flank)
         step3_file = '%s/shellscripts/step_3/%s.te_repeat.blat.sh' %(args.outdir, step3_count)
-        shells.append('sh %s' %(step3_file))
-        step3_cmds = '%s\n%s' %(blat, trim)
-        writefile(step3_file, step3_cmds)
-        step3_count += 1
+        if not os.path.isfile(blatout) or os.path.getsize(blatout) == 0:
+            shells.append('sh %s' %(step3_file))
+            step3_cmds = '%s\n%s' %(blatcmd, trim)
+            writefile(step3_file, step3_cmds)
+            step3_count += 1
             
 
     #step4 align TE trimed reads to genome
@@ -198,6 +240,16 @@ def main():
         step5_count +=1
     
     
+    #step6 characterize homozygous, heterozygous and somatic insertion
+    createdir('%s/shellscripts/step_6' %(args.outdir))
+    step6_cmd = []
+    step6_cmd.append('cat %s/repeat/results/*.all_nonref_insert.gff > %s/repeat/results/ALL.all_nonref_insert.gff' %(args.outdir, args.outdir))
+    step6_cmd.append('cat %s/repeat/results/*.all_nonref_insert.txt | grep "^TE" -v > %s/repeat/results/ALL.all_nonref_insert.txt' %(args.outdir, args.outdir))
+    step6_cmd.append('perl %s/characterizer.pl -s %s/repeat/results/ALL.all_nonref_insert.txt -b %s -g %s --samtools %s' %(RelocaTE_bin, args.outdir, bam, reference, samtools))
+    step6_file= '%s/shellscripts/step_6/0.repeat.characterize.sh' %(args.outdir)
+    shells.append('sh %s' %(step6_file)) 
+    writefile(step6_file, '\n'.join(step6_cmd))
+
     #write script
     writefile('%s/run_these_jobs.sh' %(args.outdir), '\n'.join(shells))
 

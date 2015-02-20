@@ -16,6 +16,33 @@ python CircosConf.py --input circos.config --output pipe.conf
     '''
     print message
 
+#Retro1  ACGTC   not.give        Chr4    14199..14203    -       T:7     R:4     L:3     ST:21   SR:9    SL:12
+def txt2gff(infile, outfile):
+    #print infile, outfile
+    ofile = open(outfile, 'a')
+    count = 0
+    r_pos = re.compile(r'(\d+)\.\.(\d+)')
+    with open (infile, 'r') as filehd:
+        for line in filehd:
+            line = line.rstrip()
+            #print line
+            if len(line) > 2:
+                unit = re.split(r'\t',line)
+                count += 1
+                chro, start, end = ['', 0, 0]
+                chro = unit[3]
+                m = r_pos.search(unit[4])
+                if m:
+                    start = m.groups(0)[0]
+                    end   = m.groups(0)[1]
+                r_count = re.sub(r'\D+', '', unit[7])
+                l_count = re.sub(r'\D+', '', unit[8])
+                r_supp  = re.sub(r'\D+', '', unit[10])
+                l_supp  = re.sub(r'\D+', '', unit[11])
+                r_id    = 'repeat_%s_%s_%s' %(chro, start, end)
+                print >> ofile, '%s\t%s\t%s\t%s\t%s\t.\t.\t.\tID=%s;TSD=%s;Right_junction_reads:%s;Left_junction_reads:%s;Right_support_reads:%s;Left_support_reads:%s;' %(chro, unit[2], 'RelocaTE_i',start, end, r_id, unit[1], r_count, l_count, r_supp, l_supp)
+    ofile.close()
+
 #[name, seq, start, strand]
 def Supporting_count(event, tsd_start, teSupportingReads):
     total = 0
@@ -107,13 +134,17 @@ def insertion_family(reads, read_repeat):
     else:
         return ''
 
-def write_output(result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters):
+def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools):
     createdir(result)
     ###remove insertion 
-
-    NONREF = open ('%s/%s.%s.all_nonref_insert.txt' %(result, usr_target, TE), 'w')
-    NONSUP = open ('%s/%s.%s.all_nonref_supporting.txt' %(result, usr_target, TE), 'w')
-    READS  = open ('%s/%s.%s.reads.list' %(result, usr_target, TE), 'w')
+    existingTE_bed = '%s/existingTE.bed' %('/'.join(top_dir))
+    nonref     = '%s/%s.%s.all_nonref_insert.txt' %(result, usr_target, TE)
+    nonref_gff = '%s/%s.%s.all_nonref_insert.gff' %(result, usr_target, TE)
+    nonsup     = '%s/%s.%s.all_nonref_supporting.txt' %(result, usr_target, TE)
+    nonsup_gff = '%s/%s.%s.all_nonref_supporting.gff' %(result, usr_target, TE)
+    NONREF     = open ('%s/%s.%s.all_nonref_insert.txt' %(result, usr_target, TE), 'w')
+    NONSUP     = open ('%s/%s.%s.all_nonref_supporting.txt' %(result, usr_target, TE), 'w')
+    READS      = open ('%s/%s.%s.reads.list' %(result, usr_target, TE), 'w')
     #teInsertions[event][TSD_seq][TSD_start]['count']   += 1   ## total junction reads
     #teInsertions[event][TSD_seq][TSD_start][pos]       += 1   ## right/left junction reads
     #teInsertions[event][TSD_seq][TSD_start][TE_orient] += 1   ## plus/reverse insertions 
@@ -260,11 +291,11 @@ def write_output(result, read_repeat, usr_target, exper, TE, required_reads, req
                     #only have end with junction 
                     if int(r_supporting) >= 1 and int(l_supporting) >= 1:
                         #only one end with junction but both end with supporting reads
-                        print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                        print >> NONREF, '%s\tsupporting_junction\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
                     else:
                         #only one end with junction and only one end with supporting reads
                         if (int(r_supporting) >= 1 and int(l_count) >= 1) or (int(l_supporting) >= 1 and int(r_count) >= 1):
-                            print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
+                            print >> NONREF, '%s\tsupporting_junction\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
                         elif int(t_supporting) + int(t_count) == 1:
                             #singleton
                             print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
@@ -287,101 +318,61 @@ def write_output(result, read_repeat, usr_target, exper, TE, required_reads, req
             #skip any event that have junctions, already output in previous step
             #print >> NONSUP, 'Found' %(str(event))
             continue
-        print >> NONSUP, '>%s' %(str(event))
-        sub_events = defaultdict(lambda : defaultdict(lambda : list()))
-        sub_strand = defaultdict(lambda : defaultdict(lambda : list()))
+        #print >> NONSUP, '>%s' %(str(event))
+        sub_events = defaultdict(lambda : list())
+        sub_strand = defaultdict(lambda : list())
         sub_side   = defaultdict(lambda : int()) ## record if have read from both strand
+        sub_name   = 'repeat_name'
         for read in teSupportingReads[event]:
             name   = read[0]
             seq    = read[1]
             start  = read[2]
             strand = read[3]
             sub_side[strand] = 1
-            print >> NONSUP, '%s\t%s\t%s\t%s' %(name, seq, start, strand)
-            repeat_name, repeat_side = read_to_repeat(name, read_repeat)
+            #print >> NONSUP, '%s\t%s\t%s\t%s' %(name, seq, start, strand)
+            #repeat_name, repeat_side = read_to_repeat(name, read_repeat)
             #print >> NONSUP, repeat_name, repeat_side
             #repeat_name = read_repeat[name][1] if read_repeat.has_key(name) else 'NA'
             #repeat_side = read_repeat[name][2] if read_repeat.has_key(name) else 'NA'
-            sub_events[repeat_name][repeat_side].append(read)
-            sub_strand[repeat_name][repeat_side].append(strand)
-        if len(sub_events.keys()) == 1:
+            sub_events[strand].append(read)
+        if len(sub_events.keys()) == 2:
+            ##supporting from both end
             #print >> NONSUP, 'IN'
-            for sub_name in sub_events.keys():
-                if len(sub_events[sub_name].keys()) == 2 and len(sub_side.keys()) == 2:
-                    #both direction have supporting reads, reads are from both strand
-                    #print >> NONSUP, "two direction"
-                    flag = read_direction(sub_strand[sub_name]['+'])
-                    if flag == 'left':
-                        #print >> NONSUP, 'left'
-                        ins_start = get_boundary(sub_events[sub_name]['+'], 'left')
-                        l_support = len(sub_events[sub_name]['+'])
-                        ins_end   = get_boundary(sub_events[sub_name]['-'], 'right')
-                        r_support = len(sub_events[sub_name]['-'])
-                        t_support = l_support + r_support
-                        #if ins_start > ins_end:
-                        #    continue
-                        print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '+', '0','0','0', t_support, r_support, l_support)
-                    elif flag == 'right':
-                        #print >> NONSUP, 'right'
-                        ins_start = get_boundary(sub_events[sub_name]['-'], 'left')
-                        l_support = len(sub_events[sub_name]['-'])
-                        ins_end   = get_boundary(sub_events[sub_name]['+'], 'right')
-                        r_support = len(sub_events[sub_name]['+'])
-                        t_support = l_support + r_support
-                        #if ins_start > ins_end:
-                        #    continue
-                        print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target,ins_start, ins_end, '-', '0','0','0', t_support, r_support, l_support)
-                    
-                else:
-                    if len(sub_side.keys()) == 2:
-                        continue
-                        #skip if reads are from both strand
-                    ##reads map to plus strand of repeaet
-                    if sub_events[sub_name].has_key('+'):
-                        #print >> NONSUP, 'plus on repeat'
-                        flag = read_direction(sub_strand[sub_name]['+'])
-                        if flag == 'left':
-                            #print >> NONSUP, 'left side of repeat'
-                            ##reads on minus strand on reference, thus on right side of repeat
-                            ins_start = get_boundary(sub_events[sub_name]['+'], flag)
-                            ins_end   = int(ins_start + 500*(1 + 0.2)) # insertion size of library * (1 + sd of library)
-                            l_support = len(sub_events[sub_name]['+'])
-                            r_support = 0
-                            t_support = l_support + r_support
-                            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '+', '0','0','0', t_support, r_support, l_support)
-                        elif flag == 'right':
-                            ##reads on plus strand on reference, thus on left side of repeat
-                            #print >> NONSUP, 'right side of repeat'
-                            #print sub_name
-                            ins_end   = get_boundary(sub_events[sub_name]['+'], flag)
-                            #print 'CK: %s' %(ins_end)
-                            ins_start = int(ins_end - 500*(1 + 0.2)) # insertion size of library * (1 + sd of library)
-                            l_support = 0
-                            r_support = len(sub_events[sub_name]['+'])
-                            t_support = l_support + r_support
-                            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '-', '0','0','0', t_support, r_support, l_support)
-                    elif sub_events[sub_name].has_key('-'):
-                        #print >> NONSUP, 'minus on repeat'
-                        flag = read_direction(sub_strand[sub_name]['-'])
-                        if flag == 'left':
-                            #print >> NONSUP, 'left side of repeat'
-                            ins_start = get_boundary(sub_events[sub_name]['-'], flag)
-                            ins_end   = int(ins_start + 500*(1 + 0.2)) # insertion size of library * (1 + sd of library)
-                            l_support = len(sub_events[sub_name]['-'])
-                            r_support = 0
-                            t_support = l_support + r_support
-                            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '-', '0','0','0', t_support, r_support, l_support)
-                        elif flag == 'right':
-                            #print >> NONSUP, 'right side of repeat'
-                            ins_end   = get_boundary(sub_events[sub_name]['-'], 'left')
-                            ins_start = int(ins_end - 500*(1 + 0.2)) # insertion size of library * (1 + sd of library)
-                            l_support = 0
-                            r_support = len(sub_events[sub_name]['-'])
-                            t_support = l_support + r_support
-                            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '+', '0','0','0', t_support, r_support, l_support)
+            
+            ins_start = get_boundary(sub_events['+'], 'left')
+            l_support = len(sub_events['+'])
+            ins_end   = get_boundary(sub_events['-'], 'right')
+            r_support = len(sub_events['-'])
+            t_support = l_support + r_support
+            if ins_start > ins_end:
+                continue
+            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '+', '0','0','0', t_support, r_support, l_support)
+        elif sub_events.keys()[0] == '+':
+            
+            ins_start = get_boundary(sub_events['+'], 'left')
+            ins_end   = int(ins_start + 500*(1 + 0.2)) # insertion size of library * (1 + sd of library)
+            l_support = len(sub_events['+'])
+            r_support = 0
+            t_support = l_support + r_support
+            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '+', '0','0','0', t_support, r_support, l_support)
+
+        elif sub_events.keys()[0] == '-':
+       
+            ins_end   = get_boundary(sub_events['-'], 'right')
+            ins_start = int(ins_end - 500*(1 + 0.2)) # insertion size of library * (1 + sd of library)
+            l_support = 0
+            r_support = len(sub_events['-'])
+            t_support = l_support + r_support
+            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '+', '0','0','0', t_support, r_support, l_support)
         else:
-            print >> NONSUP, 'More than one repeatname or 0'
+            #print >> NONSUP, 'More than one repeatname or 0'
             pass
+    NONREF.close()
+    NONSUP.close()
+    READS.close()
+    txt2gff(nonref, nonref_gff)
+    txt2gff(nonsup, nonsup_gff)
+    os.system('%s intersect -v -a %s -b %s >> %s' %(bedtools, nonsup_gff, existingTE_bed, nonref_gff))
 
 def read_direction(strands):
     plus  = 0
@@ -402,12 +393,12 @@ def get_boundary(reads_list, direction):
     for read_inf in reads_list:
         read_starts.append(int(read_inf[2]))
         read_ends.append(int(read_inf[2])+len(read_inf[1]))
-        print '%s\t%s\t%s\t%s' %(read_inf[0], read_inf[1], read_inf[2], read_inf[3])
+        #print '%s\t%s\t%s\t%s' %(read_inf[0], read_inf[1], read_inf[2], read_inf[3])
     if direction == 'right':
-        print 'right: %s' %(sorted(read_starts, key=int)[0])
+        #print 'right: %s' %(sorted(read_starts, key=int)[0])
         return sorted(read_starts, key=int)[0]
     elif direction == 'left':
-        print 'left: %s' %(sorted(read_ends, key=int)[-1])
+        #print 'left: %s' %(sorted(read_ends, key=int)[-1])
         return sorted(read_ends, key=int)[-1]
 
 def read_to_repeat(read_name, read_repeat):
@@ -733,22 +724,24 @@ def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
                 if unit[9] == '+':
                     for i in range(int(unit[6])-2, int(unit[6])+3):
                         existingTE_inf[unit[5]]['start'][int(i)] = 1
-                    print >> ofile_RM, '%s\t%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], 'start', str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7], '1', '+')
+                    #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7], '1', '+')
                     #print unit[10], 'start', unit[6]
                     for i in range(int(unit[7])-2, int(unit[7])+3):
                         existingTE_inf[unit[5]]['end'][int(i)] = 1
-                    print >> ofile_RM, '%s\t%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], 'end', str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '+')
+                    #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '+')
                     #print unit[10], 'end', unit[7]
+                    print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], '1', '+')
                 elif unit[9] == 'C':
                     for i in range(int(unit[6])-2, int(unit[6])+3):
                         existingTE_inf[unit[5]]['start'][int(i)] = 1
-                    print >> ofile_RM, '%s\t%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], 'start', str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7],'1', '-')
+                    #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7],'1', '-')
                     #print unit[10], 'start', unit[6]
                     for i in range(int(unit[7])-2, int(unit[7])+3):
                         existingTE_inf[unit[5]]['end'][int(i)] = 1
-                    print >> ofile_RM, '%s\t%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], 'end', str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '-')
+                    #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '-')
                     #print unit[10], 'end', unit[7]
-
+                    print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], '1', '-')
+    ofile_RM.close()
 
 def existingTE_RM(top_dir, infile, existingTE_inf):
     r_end = re.compile(r'\((\d+)\)')
@@ -786,7 +779,7 @@ def existingTE_RM(top_dir, infile, existingTE_inf):
                             existingTE_inf[unit[5]]['end'][int(i)] = 1
                         print >> ofile_RM, '%s\t%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], 'end', str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '-')
                         #print unit[10], 'end', unit[7]
- 
+    ofile_RM.close() 
 
 def complement(seq):
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
@@ -1150,6 +1143,15 @@ def main():
     else:
         print 'Existing TE file does not exists or zero size'
 
+    bedtools = ''
+    try:
+        subprocess.check_output('which bedtools', shell=True)
+        bedtools = subprocess.check_output('which bedtools', shell=True)
+        bedtools = re.sub(r'\n', '', bedtools)
+    except:
+        bedtools = '/opt/bedtools/2.17.0-25-g7b42b3b/bin//bedtools'
+
+
     ##get the regelar expression patterns for mates and for the TE
     ##when passed on the command line as an argument, even in single
     ##quotes I lose special regex characters
@@ -1186,7 +1188,7 @@ def main():
     #result  = '%s/results' %('/'.join(top_dir))
     #read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
     #read_repeat = read_repeat_name(read_repeat_files)
-    write_output(result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters)
+    write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools)
 
  
 if __name__ == '__main__':
