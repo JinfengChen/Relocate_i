@@ -118,6 +118,13 @@ def main():
         blat = re.sub(r'\n', '', blat)
     except:
         blat = '/usr/local/bin/blat'   
+    
+    try:
+        subprocess.check_output('which seqtk', shell=True)
+        seqtk = subprocess.check_output('which seqtk', shell=True)
+        seqtk = re.sub(r'\n', '', seqtk)
+    except:
+        seqtk = '/rhome/cjinfeng/software/tools/seqtk-master//seqtk'
 
     #MSU_r7.fa.bwt
     if not os.path.isfile('%s.bwt' %(reference)):
@@ -157,15 +164,19 @@ def main():
     #step2 fastq to fasta
     fastas = defaultdict(lambda : str)
     if mode == 'fastq':
-        fastqs = glob.glob('%s/*.f*q' %(fastq_dir))
+        fastqs = glob.glob('%s/*.f*q*' %(fastq_dir))
         step2_flag = 0
         step2_count= 0
         for fq in fastqs:
-            fa    = '%s.fa' %(os.path.splitext(fq)[0])
+            fa    = ''
+            if os.path.splitext(fq)[-1] == '.gz':
+                fa    = '%s.fa' %(os.path.splitext(os.path.splitext(fq)[0])[0])
+            else:
+                fa    = '%s.fa' %(os.path.splitext(fq)[0])
             fastas[fa] = fq
             if not os.path.isfile(fa):
                 createdir('%s/shellscripts/step_2' %(args.outdir))
-                fq2fa = '%s/relocaTE_fq2fa.pl %s %s' %(RelocaTE_bin, fq, fa)
+                fq2fa = '%s seq -A %s > %s' %(seqtk, fq, fa)
                 step2_file = '%s/shellscripts/step_2/%s.fq2fq.sh' %(args.outdir, step2_count)
                 shells.append('sh %s' %(step2_file))
                 writefile(step2_file, fq2fa)
@@ -190,8 +201,8 @@ def main():
             cmd_step2.append('%s view -h %s | awk \'$5<60\' | samtools view -Shb - | samtools sort -m 500000000 -n - %s 2> %s' %(samtools, bam, os.path.splitext(subbam)[0], run_std))
         if not os.path.isfile(fq1) and not os.path.isfile(fq2):
             cmd_step2.append('%s bamtofastq -i %s -fq %s -fq2 %s 2> %s' %(bedtools, subbam, fq1, fq2, run_std))
-        cmd_step2.append('%s/relocaTE_fq2fa.pl %s %s' %(RelocaTE_bin, fq1, fa1))
-        cmd_step2.append('%s/relocaTE_fq2fa.pl %s %s' %(RelocaTE_bin, fq2, fa2))
+        cmd_step2.append('%s seq -A %s > %s' %(seqtk, fq1, fa1))
+        cmd_step2.append('%s seq -A %s > %s' %(seqtk, fq2, fa2))
         step2_flag = 0
         if not os.path.isfile(fa1) and not os.path.isfile(fa2):
             createdir('%s/shellscripts/step_2' %(args.outdir))

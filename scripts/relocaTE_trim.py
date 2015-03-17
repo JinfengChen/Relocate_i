@@ -6,6 +6,7 @@ import re
 import os
 import argparse
 from Bio import SeqIO
+import gzip
 
 def usage():
     test="name"
@@ -155,7 +156,13 @@ def main():
         ofile_rr = open(read_repeat_file, 'w')
         ##go thru each fq record in the fq files. if the name of the seq is in the blat file
         ##trim the seq
-        with open (fq_file1, 'r') as filehd:
+        #f_type = 'rb' if os.path.splitext(fq_file1)[-1] == '.gz' else 'r'
+        filehd = ''
+        if os.path.splitext(fq_file1)[-1] == '.gz':
+            filehd = gzip.open (fq_file1, 'rb')
+        else:
+            filehd = open (fq_file1, 'r')
+        if 1:
             for line in filehd:
                 line = line.rstrip()
                 header = line[1:]
@@ -254,6 +261,7 @@ def main():
                         print '@%s\n%s\n%s\n%s' %(header, trimmed_seq, qualh, trimmed_qual)
                     ##any read that was in the blat file is written here
                     print >> ofile_fq, '@%s\n%s\n%s\n%s' %(header, seq, qualh, qual)
+        filehd.close()
         ofile_te5.close()
         ofile_te3.close()
         ofile_fq.close()
