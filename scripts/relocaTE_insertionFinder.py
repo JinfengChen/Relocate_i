@@ -134,7 +134,7 @@ def insertion_family(reads, read_repeat):
     else:
         return ''
 
-def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools):
+def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size):
     createdir(result)
     ###remove insertion 
     existingTE_bed = '%s/existingTE.bed' %('/'.join(top_dir))
@@ -350,7 +350,7 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
         elif sub_events.keys()[0] == '+':
             
             ins_start = get_boundary(sub_events['+'], 'left')
-            ins_end   = int(ins_start + 500*(1 + 0.2)) # insertion size of library * (1 + sd of library)
+            ins_end   = int(ins_start + float(lib_size)*(1 + 0.2)) # insertion size of library * (1 + sd of library)
             l_support = len(sub_events['+'])
             r_support = 0
             t_support = l_support + r_support
@@ -359,7 +359,7 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
         elif sub_events.keys()[0] == '-':
        
             ins_end   = get_boundary(sub_events['-'], 'right')
-            ins_start = int(ins_end - 500*(1 + 0.2)) # insertion size of library * (1 + sd of library)
+            ins_start = int(ins_end - float(lib_size)*(1 + 0.2)) # insertion size of library * (1 + sd of library)
             l_support = 0
             r_support = len(sub_events['-'])
             t_support = l_support + r_support
@@ -1119,6 +1119,7 @@ def main():
     existing_TE          = sys.argv[8] ## existingTE.blatout
     mm_allow             = sys.argv[9] ## mismatches allowed: 0, 1, 2, 3
     bowtie2              = sys.argv[10] ## use bowtie2 or not: 1 or 0
+    lib_size             = sys.argv[11] ## insert size of library
     #relax_reference      = sys.argv[11]## relax mode for existing TE: 1 or 0
     #relax_align          = sys.argv[12]## relax mode for insertion: 1 or 0
     bowtie_sam           = 1           ## change to shift or remove in V2
@@ -1188,7 +1189,7 @@ def main():
     #result  = '%s/results' %('/'.join(top_dir))
     #read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
     #read_repeat = read_repeat_name(read_repeat_files)
-    write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools)
+    write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size)
 
  
 if __name__ == '__main__':

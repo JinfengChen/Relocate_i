@@ -40,6 +40,7 @@ def main():
     parser.add_argument('-r', '--reference_ins')
     parser.add_argument('-f', '--fastmap')
     parser.add_argument('-o', '--outdir')
+    parser.add_argument('-s', '--size')
     parser.add_argument('-v', dest='verbose', action='store_true')
     args = parser.parse_args()
     
@@ -82,6 +83,9 @@ def main():
     else:
         args.outdir = os.path.abspath(args.outdir)
         createdir(args.outdir)
+
+    if args.size is None:
+        args.size = 500
 
     samtools = ''
     bedtools = ''
@@ -233,7 +237,7 @@ def main():
     createdir('%s/shellscripts/step_5' %(args.outdir))
     step5_count = 0
     for chrs in ids:
-        step5_cmd = 'python %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag)
+        step5_cmd = 'python %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0 %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.size)
         step5_file= '%s/shellscripts/step_5/%s.repeat.findSites.sh' %(args.outdir, step5_count)
         shells.append('sh %s' %(step5_file))
         writefile(step5_file, step5_cmd)
