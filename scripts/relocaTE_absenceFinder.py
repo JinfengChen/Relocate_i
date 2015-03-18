@@ -134,246 +134,33 @@ def insertion_family(reads, read_repeat):
     else:
         return ''
 
-def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size):
-    createdir(result)
-    ###remove insertion 
-    existingTE_bed = '%s/existingTE.bed' %('/'.join(top_dir))
-    nonref     = '%s/%s.%s.all_nonref_insert.txt' %(result, usr_target, TE)
-    nonref_gff = '%s/%s.%s.all_nonref_insert.gff' %(result, usr_target, TE)
-    nonsup     = '%s/%s.%s.all_nonref_supporting.txt' %(result, usr_target, TE)
-    nonsup_gff = '%s/%s.%s.all_nonref_supporting.gff' %(result, usr_target, TE)
-    NONREF     = open ('%s/%s.%s.all_nonref_insert.txt' %(result, usr_target, TE), 'w')
-    NONSUP     = open ('%s/%s.%s.all_nonref_supporting.txt' %(result, usr_target, TE), 'w')
-    READS      = open ('%s/%s.%s.reads.list' %(result, usr_target, TE), 'w')
-    #teInsertions[event][TSD_seq][TSD_start]['count']   += 1   ## total junction reads
-    #teInsertions[event][TSD_seq][TSD_start][pos]       += 1   ## right/left junction reads
-    #teInsertions[event][TSD_seq][TSD_start][TE_orient] += 1   ## plus/reverse insertions 
-    for event in sorted(teInsertions.keys(), key=int):
-        #print 'event: %s' %(event)
-        cluster_collection = []
-        start_collection = []
-        start_both_junction = 0
-        chro = teReadClusters[event]['read_inf']['seq']['chr']
-        for start in sorted(teInsertions[event].keys(), key=int):
-            #tir1_end = int(start)
-            #tir2_end = int(start) - 1
-            
-            #####supporting reads
-            total_supporting, left_supporting, right_supporting = [0, 0, 0]
-            left_reads, right_reads = ['', '']
-            total_supporting, left_supporting, right_supporting, left_reads, right_reads = Supporting_count(event, start, teSupportingReads)
-            repeat_supporting = insertion_family_supporting('%s,%s' %(left_reads, right_reads), read_repeat)
-            #del teSupportingReads[event] 
-            #####tsd within one start position into one start position
-            tsd_count         = {}
-            TE_orient, repeat_junction = ['','']
-            TE_orient_foward, TE_orient_reverse    = [0,0]
-            total_count, left_count, right_count   = [0,0,0]
-            reads             = []
-            #if two or more TSD at this loci, some might be caused by sequencing error, we add the count
-            #and use high frequent one to get te orientation and family
-            #if only one TSD found, we acturally use only this one
-            for foundTSD in sorted(teInsertions[event][start].keys()):
-                total_count += teInsertions[event][start][foundTSD]['count']
-                left_count  += teInsertions[event][start][foundTSD]['left']
-                right_count += teInsertions[event][start][foundTSD]['right']
-                TE_orient_foward  += teInsertions[event][start][foundTSD]['+']
-                TE_orient_reverse += teInsertions[event][start][foundTSD]['-']
-                tsd_count[foundTSD] = teInsertions[event][start][foundTSD]['count']
-                reads.extend(teInsertions_reads[event][start][foundTSD]['read'])
-            tsd_top = OrderedDict(sorted(tsd_count.items(), key=lambda x: x[1])).keys()[-1] 
-            TE_orient         = '+' if int(TE_orient_foward) > int(TE_orient_reverse) else '-'
-            repeat_junction   = insertion_family(','.join(reads), read_repeat)
-
-            #####information on each start position
-            start_both_junction = start_both_junction + 1 if (int(left_count) > 0 and int(right_count) > 0) else start_both_junction
-            start_collection.append([start, foundTSD, total_count, left_count, right_count, repeat_junction, ','.join(reads), total_supporting, left_supporting, right_supporting, left_reads, right_reads, repeat_supporting, TE_orient])
-
-        if len(teInsertions[event].keys()) > 1:
-            #two or more start found in one read cluster
-            if int(start_both_junction) == len(teInsertions[event].keys()):
-                #we keep all if they all supported by junction at both direction
-                cluster_collection.extend(start_collection)
-            else:
-                #not all supported at both end of junction
-                if int(start_both_junction) > 0:
-                    #we have tsd supported by junction at both direction
-                    #we only keep these supported by junction at both direction
-                    #even some supported by more than 1 junction reads, we thought due to sequence context
-                    #these insertions should have junction at both direction if they are true
-                    for start_it in start_collection:
-                        if int(start_it[3]) > 0 and int(start_it[4] > 0):
-                            cluster_collection.append(start_it)
-                        else:
-                            continue
-                            #for these cluster, we automaticly remove these with only one junction
-                            #due to the local coverage, if we found both junction for one insertion
-                            #we should find both junction for others too 
-                else:
-                    #do not have tsd supported by junction at both direction
-                    #we keep the top one with higher number of junction reads
-                    top_start_it = []
-                    top_start_junction = 0
-                    for start_it in start_collection:
-                        tir1_end = int(start_it[0]) 
-                        tir2_end = int(start_it[0]) - 1
-                        if existingTE_inf[chro]['start'].has_key(tir1_end) or existingTE_inf[chro]['end'].has_key(tir2_end):
-                            continue
-                            #remove if overlap with existingTE
-                        else:
-                            if int(top_start_junction) < int(start_it[2]):
-                                top_start_junction = int(start_it[2])
-                                top_start_it       = start_it
-                    if top_start_junction > 0:
-                        cluster_collection.append(top_start_it)
-                    else:
-                        ##all removed due to overlap with existingTE
-                        continue
-                        #del teInsertions[event]
+#mPing   GAA     not.give        Chr4    3386246..3386248        -       T:3     R:1     L:2     ST:0    SR:0    SL:0
+def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, existingTE_found, teReadClusters, bedtools, lib_size):
+    ref     = '%s/%s.%s.all_ref_insert.txt' %(result, usr_target, TE)
+    ref_gff = '%s/%s.%s.all_ref_insert.gff' %(result, usr_target, TE)
+    REF     = open ('%s/%s.%s.all_ref_insert.txt' %(result, usr_target, TE), 'w')
+    #REFGFF     = open ('%s/%s.%s.all_ref_insert.gff' %(result, usr_target, TE), 'w')
+    #READS      = open ('%s/%s.%s.all_ref_reads.list' %(result, usr_target, TE), 'w')
+    r = re.compile(r'(\w+):(\d+)-(\d+):(.*)')
+    for te_id in sorted(existingTE_found.keys()):
+        print 'Found: %s' %(te_id)
+        strand, chro, start, end = ['', '', '', '']
+        if r.search(te_id):
+            strand = r.search(te_id).groups(0)[3]
+            chro   = r.search(te_id).groups(0)[0]
+            start  = r.search(te_id).groups(0)[1]
+            end    = r.search(te_id).groups(0)[2]
+        l_count, r_count = [0, 0]
+        if strand == '+':
+            l_count = len(existingTE_found[te_id]['start'].keys())
+            r_count = len(existingTE_found[te_id]['end'].keys())
         else:
-            #only one tsd found
-            if int(start_collection[0][3]) > 0 and int(start_collection[0][4]) > 0:
-                #both junction found, must be insertion
-                cluster_collection.extend(start_collection)
-            else:
-                #only one junction, check if overlap with existingTE
-                tir1_end = int(start_collection[0][0])
-                tir2_end = int(start_collection[0][0]) - 1
-                if existingTE_inf[chro]['start'].has_key(tir1_end) or existingTE_inf[chro]['end'].has_key(tir2_end):
-                    #overlap with existingTE, delete record from teInsertions
-                    continue
-                    #del teInsertions[event]
-                else:
-                    #not overlap with existingTE, store for output
-                    cluster_collection.extend(start_collection)
-         
-        #[start, foundTSD, total_count, left_count, right_count, repeat_junction, ','.join(reads),
-        #total_supporting, left_supporting, right_supporting, left_reads, right_reads, repeat_supporting, TE_orient]
-        for insertion in cluster_collection:
-            #####insertion te name
-            r_supporting = insertion[12]
-            r_junction   = insertion[5]
-            repeat_family     = 'NA'
-            if r_junction == r_supporting and r_junction != 'NA':
-                repeat_family = r_junction
-            elif r_junction != r_supporting and r_junction != 'NA' and r_supporting != 'NA':
-                repeat_family = '%s/%s' %(r_junction, r_supporting)
-            elif r_junction != 'NA':
-                repeat_family = r_junction
-            elif r_supporting != 'NA':
-                repeat_family = r_supporting
-            
-            #####write to file
-            t_count = insertion[2]
-            l_count = insertion[3]
-            r_count = insertion[4]
-            i_start = insertion[0]
-            i_tsd   = insertion[1]
-            i_reads = insertion[6]
-            l_reads = insertion[10]
-            r_reads = insertion[11]
-            t_supporting = insertion[7]
-            l_supporting = insertion[8]
-            r_supporting = insertion[9]
-            t_orient     = insertion[13]
-            
-            if int(l_count) >= int(required_left_reads) or int(r_count) >= int(required_right_reads):
-                #at lease need one end have junction reads
-                coor       = int(i_start) + (len(i_tsd) - 1)
-                coor_start = coor - (len(i_tsd) - 1)
-                print >> READS, '%s\t%s:%s..%s\tJunction_reads\t%s' %(TE, usr_target, coor_start, coor, i_reads)
-                print >> READS, '%s\t%s:%s..%s\tLeft_supporting_reads\t%s' %(TE, usr_target, coor_start, coor, l_reads)
-                print >> READS, '%s\t%s:%s..%s\tRight_supporting_reads\t%s' %(TE, usr_target, coor_start, coor, r_reads)
-                if int(l_count) > 0 and int(r_count) >0:
-                    #both ends have junction reads
-                    print >> NONREF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, i_tsd, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
-                else:
-                    #only have end with junction 
-                    if int(r_supporting) >= 1 and int(l_supporting) >= 1:
-                        #only one end with junction but both end with supporting reads
-                        print >> NONREF, '%s\tsupporting_junction\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
-                    else:
-                        #only one end with junction and only one end with supporting reads
-                        if (int(r_supporting) >= 1 and int(l_count) >= 1) or (int(l_supporting) >= 1 and int(r_count) >= 1):
-                            print >> NONREF, '%s\tsupporting_junction\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
-                        elif int(t_supporting) + int(t_count) == 1:
-                            #singleton
-                            print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
-                        else:
-                            #insufficient
-                            print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
-            else:
-                #no junction reads
-                if int(r_supporting) >= 1 and int(l_supporting) >= 1:
-                    #no junction reads, but both end with supporting reads
-                    print >> NONREF, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
-                elif int(t_supporting) == 1:
-                    print >> NONREF, '%s\tsingleton\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
-                else:
-                    print >> NONREF, '%s\tinsufficient_data\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(repeat_family, exper, usr_target, coor_start, coor, t_orient, t_count, r_count, l_count, t_supporting, r_supporting, l_supporting)
-                #pass
-    ###only supporting reads, no junction record
-    for event in sorted(teSupportingReads.keys()):
-        if teInsertions.has_key(event):
-            #skip any event that have junctions, already output in previous step
-            #print >> NONSUP, 'Found' %(str(event))
-            continue
-        #print >> NONSUP, '>%s' %(str(event))
-        sub_events = defaultdict(lambda : list())
-        sub_strand = defaultdict(lambda : list())
-        sub_side   = defaultdict(lambda : int()) ## record if have read from both strand
-        sub_name   = 'repeat_name'
-        for read in teSupportingReads[event]:
-            name   = read[0]
-            seq    = read[1]
-            start  = read[2]
-            strand = read[3]
-            sub_side[strand] = 1
-            #print >> NONSUP, '%s\t%s\t%s\t%s' %(name, seq, start, strand)
-            #repeat_name, repeat_side = read_to_repeat(name, read_repeat)
-            #print >> NONSUP, repeat_name, repeat_side
-            #repeat_name = read_repeat[name][1] if read_repeat.has_key(name) else 'NA'
-            #repeat_side = read_repeat[name][2] if read_repeat.has_key(name) else 'NA'
-            sub_events[strand].append(read)
-        if len(sub_events.keys()) == 2:
-            ##supporting from both end
-            #print >> NONSUP, 'IN'
-            
-            ins_start = get_boundary(sub_events['+'], 'left')
-            l_support = len(sub_events['+'])
-            ins_end   = get_boundary(sub_events['-'], 'right')
-            r_support = len(sub_events['-'])
-            t_support = l_support + r_support
-            if ins_start > ins_end:
-                continue
-            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '+', '0','0','0', t_support, r_support, l_support)
-        elif sub_events.keys()[0] == '+':
-            
-            ins_start = get_boundary(sub_events['+'], 'left')
-            ins_end   = int(ins_start + float(lib_size)*(1 + 0.2)) # insertion size of library * (1 + sd of library)
-            l_support = len(sub_events['+'])
-            r_support = 0
-            t_support = l_support + r_support
-            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '+', '0','0','0', t_support, r_support, l_support)
-
-        elif sub_events.keys()[0] == '-':
-       
-            ins_end   = get_boundary(sub_events['-'], 'right')
-            ins_start = int(ins_end - float(lib_size)*(1 + 0.2)) # insertion size of library * (1 + sd of library)
-            l_support = 0
-            r_support = len(sub_events['-'])
-            t_support = l_support + r_support
-            print >> NONSUP, '%s\tsupporting_reads\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:%s\tSR:%s\tSL:%s' %(sub_name, exper, usr_target, ins_start, ins_end, '+', '0','0','0', t_support, r_support, l_support)
-        else:
-            #print >> NONSUP, 'More than one repeatname or 0'
-            pass
-    NONREF.close()
-    NONSUP.close()
-    READS.close()
-    txt2gff(nonref, nonref_gff)
-    txt2gff(nonsup, nonsup_gff)
-    os.system('%s intersect -v -a %s -b %s >> %s' %(bedtools, nonsup_gff, existingTE_bed, nonref_gff))
-
+            l_count = len(existingTE_found[te_id]['end'].keys())
+            r_count = len(existingTE_found[te_id]['start'].keys())
+        if l_count > 0 and r_count > 0:
+            print >> REF, '%s\t%s\t%s\t%s\t%s..%s\t%s\tT:%s\tR:%s\tL:%s\tST:0\tSR:0\tSL:0' %('repeat', 'UNK', exper, chro, start, end, strand, l_count+r_count, r_count, l_count)
+    REF.close()
+    
 def read_direction(strands):
     plus  = 0
     minus = 0
@@ -695,22 +482,30 @@ def align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, star
         #print '%s\t%s' %(count, bin_ins)
     return (bin_ins, count)
 
-def existingTE(infile, existingTE_inf, existingTE_found):
-    r = re.compile(r'(\S+)\t(\S+):(\d+)\.\.(\d+)')
-    if infile != 'NONE':
-        blat = 0
-        with open(infile, 'r') as filehd:
-            for line in filehd:
-                line = line.rstrip() 
-                if not blat:
-                    if r.search(line):
-                        te, chrs, start, end = r.search(line).groups(0)
-                        start, end = sorted([start, end], key=int)
-                        existingTE_inf[te]['start'][int(start)] = line
-                        existingTE_inf[te]['end'][int(end)]     = line
-                        existingTE_found[line]['start']= 0
-                        existingTE_found[line]['end']  = 0
-
+#existing_TE_bed_reader
+#Chr4    1072    1479    Simple_repeat:1072-1479 1       +
+#Chr4    1573    1779    Simple_repeat:1573-1779 0       +
+def existing_TE_bed_reader(infile, existingTE_intact):
+    print 'Reading existing TE bed'
+    with open(infile, 'r') as filehd:
+        for line in filehd:
+            line = line.rstrip() 
+            if len(line) > 2 and not line.startswith(r'#'):
+                unit = re.split(r'\t', line)
+                ##intact repeat
+                print line
+                if int(unit[4]) == 1:
+                    te_id = '%s:%s-%s:%s' %(unit[0], unit[1], unit[2], unit[5])
+                    existingTE_intact[unit[0]]['start'][int(unit[1])] = te_id
+                    existingTE_intact[unit[0]]['end'][int(unit[2])] = te_id
+                    print '%s\t%s\t%s' %(unit[0], unit[1], 'start')
+                    print '%s\t%s\t%s' %(unit[0], unit[2], 'end')
+                    #if unit[5] == '+':
+                    #    existingTE_intact[unit[0]]['start'][unit[1]] = te_id
+                    #    existingTE_intact[unit[0]]['end'][unit[2]] = te_id
+                    #else:
+                    #    existingTE_intact[unit[0]]['end'][unit[1]] = te_id
+                    #    existingTE_intact[unit[0]]['start'][unit[2]] = te_id
 
 def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
     ofile_RM = open('%s/existingTE.bed' %(top_dir), 'w')
@@ -722,37 +517,25 @@ def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
                 #print line
                 #print unit[5], unit[9], unit[12], unit[13], unit[14]
                 if unit[9] == '+':
-                    #for i in range(int(unit[6])-2, int(unit[6])+3):
-                    #    existingTE_inf[unit[5]]['start'][int(i)] = 1
+                    for i in range(int(unit[6])-2, int(unit[6])+3):
+                        existingTE_inf[unit[5]]['start'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7], '1', '+')
                     #print unit[10], 'start', unit[6]
-                    #for i in range(int(unit[7])-2, int(unit[7])+3):
-                    #    existingTE_inf[unit[5]]['end'][int(i)] = 1
+                    for i in range(int(unit[7])-2, int(unit[7])+3):
+                        existingTE_inf[unit[5]]['end'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '+')
                     #print unit[10], 'end', unit[7]
-
-                    ##if this repeat is a intact element
-                    intact = 0
-                    if int(unit[12]) == 1 and len(unit[14]) == 3:
-                        unit[14] =re.sub(r'\(|\)', '', unit[14])
-                        if int(unit[14]) == 0:
-                            intact = 1
-                    print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], intact, '+')
+                    print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], '1', '+')
                 elif unit[9] == 'C':
-                    #for i in range(int(unit[6])-2, int(unit[6])+3):
-                    #    existingTE_inf[unit[5]]['start'][int(i)] = 1
+                    for i in range(int(unit[6])-2, int(unit[6])+3):
+                        existingTE_inf[unit[5]]['start'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7],'1', '-')
                     #print unit[10], 'start', unit[6]
-                    #for i in range(int(unit[7])-2, int(unit[7])+3):
-                    #    existingTE_inf[unit[5]]['end'][int(i)] = 1
+                    for i in range(int(unit[7])-2, int(unit[7])+3):
+                        existingTE_inf[unit[5]]['end'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '-')
                     #print unit[10], 'end', unit[7]
-                    intact = 0
-                    if int(unit[14]) == 1 and len(unit[12]) == 3:
-                        unit[12] =re.sub(r'\(|\)', '', unit[12])
-                        if int(unit[12]) == 0:
-                            intact = 1
-                    print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], intact, '-')
+                    print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], '1', '-')
     ofile_RM.close()
 
 def existingTE_RM(top_dir, infile, existingTE_inf):
@@ -859,22 +642,22 @@ def TSD_check_single(event, seq, chro, start, real_name, read_repeat, name, TSD,
     print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
-        if 0:
-            continue
-        #if pos == 'left':
-        #    tir1_end = int(TSD_start)
-        #    print 'tir1: %s' %(tir1_end)
-        #elif pos == 'right':
-        #    tir2_end = int(TSD_start) - 1
-        #    print 'tir2: %s' %(tir2_end)
-        #if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
-        #    te_id = existingTE_inf[chro]['start'][tir1_end]
-        #    #existingTE_found[te_id]['start'] += 1
-        #    print 'tir1'
-        #elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
-        #    te_id = existingTE_inf[chro]['end'][tir2_end]
-        #    #existingTE_found[te_id]['end'] += 1
-        #    print 'tir2'
+        #if 0:
+        #    continue
+        if pos == 'left':
+            tir1_end = int(TSD_start)
+            print 'tir1: %s' %(tir1_end)
+        elif pos == 'right':
+            tir2_end = int(TSD_start) - 1
+            print 'tir2: %s' %(tir2_end)
+        if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
+            te_id = existingTE_inf[chro]['start'][tir1_end]
+            existingTE_found[te_id]['start'][name] = event
+            print 'tir1'
+        elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
+            te_id = existingTE_inf[chro]['end'][tir2_end]
+            existingTE_found[te_id]['end'][name] = event
+            print 'tir2'
         else:
             print 'not match'
             ##non reference insertions
@@ -934,22 +717,22 @@ def TSD_check(event, seq, chro, start, real_name, read_repeat, name, TSD, strand
     print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
-        if 0:
-            continue
-        #if pos == 'left':
-        #    tir1_end = int(start) + len(seq)
-        #    print 'tir1: %s' %(tir1_end)
-        #elif pos == 'right':
-        #    tir2_end = int(start) - 1
-        #    print 'tir2: %s' %(tir2_end)
-        #if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
-        #    te_id = existingTE_inf[chro]['start'][tir1_end]
-        #    #existingTE_found[te_id]['start'] += 1
-        #    print 'tir1'
-        #elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
-        #    te_id = existingTE_inf[chro]['end'][tir2_end]
-        #    #existingTE_found[te_id]['end'] += 1
-        #    print 'tir2'
+        #if 0:
+        #    continue
+        if pos == 'left':
+            tir1_end = int(start) + len(seq)
+            print 'tir1: %s' %(tir1_end)
+        elif pos == 'right':
+            tir2_end = int(start) - 1
+            print 'tir2: %s' %(tir2_end)
+        if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
+            te_id = existingTE_inf[chro]['start'][tir1_end]
+            existingTE_found[te_id]['start'][name] = event
+            print 'tir1'
+        elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
+            te_id = existingTE_inf[chro]['end'][tir2_end]
+            existingTE_found[te_id]['end'][name] = event 
+            print 'tir2'
         else:
             print 'not match'
             ##non reference insertions
@@ -1020,84 +803,6 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
     if r_tsd.search(TSD):
         TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)        
         
-def find_insertion_cluster_sam(sorted_align, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found):
-    align_seg = pysam.AlignedSegment()
-    r = re.compile(r':(start|end):(5|3)')
-    r_tsd = re.compile(r'UNK|UKN|unknown', re.IGNORECASE)
-    bin_ins        = [0]
-    count          = 0
-    TSD_len        = len(TSD)
-    ##go through the reads, cluster reads and determine junction reads and supporting reads
-    for record in sorted_align.keys():
-        name, flag, ref, start, MAPQ, cigar, MRNM, MPOS, TLEN, seq, qual, tag = ['']*12
-        try:
-            name, flag, ref, start, MAPQ, cigar, MRNM, MPOS, TLEN, seq, qual, tag = re.split(r'\t', record, 11)
-        except:
-            try:
-                name, flag, ref, start, MAPQ, cigar, MRNM, MPOS, TLEN, seq, qual = re.split(r'\t', record, 10)
-            except:
-                print 'sam format error, can not split into 11 or 12 field'
-                exit()
-        #tags = re.split(r'\t', tags)
-        if int(MAPQ) < 40:
-            continue
-        end = len(seq) + int(start) - 1 # should not allowed for indel or softclip
-        align_seg.flag = int(flag)
-        strand = ''
-        if int(flag) == 0:
-            strand = '+'
-        else:
-            strand = '-' if align_seg.is_reverse else '+'
-        #print name, TLEN, tags[0]
-        range_allowance = 0
-        padded_start    = bin_ins[0] - range_allowance
-        padded_end      = bin_ins[-1] - range_allowance 
-        m = r.search(name)
-        if m:
-            #insertions
-            #print 'insertions: %s' %(name)
-            if (int(start) >= padded_start and int(start) <= padded_end) or (int(end) >= padded_start and int(end) <= padded_end):
-                bin_ins.extend([int(start), int(end)])
-                bin_ins = sorted(bin_ins, key=int)
-                if not r_tsd.search(TSD):
-                    TSD_check(count, seq, start, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
-                else:
-                    calculate_cluster_depth(count, seq, start, name, strand, teReadClusters, teReadClusters_count, teReadClusters_depth)
-            else:
-                #if start and end do not fall within last start and end
-                #we now have a different insertion event
-                count += 1
-                if not r_tsd.search(TSD):
-                    TSD_check(count, seq, start, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
-                else:
-                    calculate_cluster_depth(count, seq, start, name, strand, teReadClusters, teReadClusters_count, teReadClusters_depth)
-                #initial insertion site boundary
-                bin_ins = [int(start), int(end)]
-        else:
-            #supporting reads
-            #print 'supportings: %s' %(name)
-            pass
-        #print name, flag, strand
-    if r_tsd.search(TSD):
-        TSD_from_read_depth(teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
-
-##default sam, not deal with paired end mapping and supporting reads 
-def remove_redundant_sam(infile, target):
-    data = defaultdict(str)
-    with open (infile, 'r') as filehd:
-        for line in filehd:
-            line = line.rstrip()
-            if len(line) > 2 and not line.startswith(r'@'):
-                unit = re.split(r'\t',line)
-                if target != 'ALL' and unit[2] != target:
-                    continue
-                else:
-                    start = unit[3]
-                    if not data.has_key(line):
-                        data[line] = start
-    data = OrderedDict(sorted(data.items(), key=lambda x: x[1]))
-    return data
-
 def createdir(dirname):
     if not os.path.exists(dirname):
         os.mkdir(dirname)
@@ -1136,7 +841,7 @@ def main():
     #relax_align          = sys.argv[12]## relax mode for insertion: 1 or 0
     bowtie_sam           = 1           ## change to shift or remove in V2
     existingTE_inf       = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : str)))
-    existingTE_found     = defaultdict(lambda : defaultdict(lambda : int))
+    existingTE_found     = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : str)))
     bwa                  = 0
     teInsertions         = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : int()))))
     teInsertions_reads   = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : list()))))
@@ -1147,12 +852,12 @@ def main():
 
     top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
     #read existing TE from file
-    r_te = re.compile(r'repeatmasker|rm|\.out', re.IGNORECASE)
-    if os.path.isfile(existing_TE) and os.path.getsize(existing_TE) > 0:
-        if r_te.search(existing_TE):
-            existingTE_RM_ALL('/'.join(top_dir), existing_TE, existingTE_inf)
-        else:
-            existingTE('/'.join(top_dir), existing_TE, existingTE_inf, existingTE_found)
+    #existing_TE_intact = defaultdict(lambda : defaultdict(lambda : int()))
+    existingTE_intact = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : str)))
+    existingTE_bed = '%s/existingTE.bed' %('/'.join(top_dir))
+    print existingTE_bed
+    if os.path.isfile(existingTE_bed) and os.path.getsize(existingTE_bed) > 0:
+        existing_TE_bed_reader(existingTE_bed, existingTE_intact)
     else:
         print 'Existing TE file does not exists or zero size'
 
@@ -1173,17 +878,6 @@ def main():
     TSD       = mate_file[3]
     TSDpattern= 1 if s.search(TSD) else 0
 
-    
-    ##remove redundant alignment, no need to if we used combined bam file from previous step
-    #sorted_align = defaultdict(lambda : str)
-    #if bwa == 1:
-    #    sorted_align = remove_redundant_sam(align_file, usr_target)
-    #elif bowtie_sam == 1:
-    #    sorted_align = remove_redundant_sam(align_file, usr_target)
-    #else:
-    #    print 'We accept only sam format right now'
-    #    usage() 
-    #    exit(2)
 
     ##read -> repeat relation
     #top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
@@ -1192,16 +886,10 @@ def main():
     read_repeat = read_repeat_name(read_repeat_files)
 
     ##cluster reads around insertions
-    #find_insertion_cluster_sam(sorted_align, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found)
-    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads)
+    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_intact, existingTE_found, teSupportingReads)
 
-
-    ##output insertions
-    #top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
-    #result  = '%s/results' %('/'.join(top_dir))
-    #read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
-    #read_repeat = read_repeat_name(read_repeat_files)
-    write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size)
+    ##output absence
+    write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_intact, existingTE_found, teReadClusters, bedtools, lib_size)
 
  
 if __name__ == '__main__':

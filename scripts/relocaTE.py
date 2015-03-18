@@ -11,7 +11,13 @@ import glob
 def usage():
     test="name"
     message='''
-python CircosConf.py --input circos.config --output pipe.conf
+RelocaTEi: improved version of RelocaTE for calling transposable element insertions
+
+bam mode:
+python relocaTE.py --bam MSU7.Chr4.ALL.rep1_reads_2X_100_500.bam --genome_fasta MSU7.Chr4.fa --te_fasta mping.fa --reference_ins MSU_r7.fa.RepeatMasker.Chr4.out --outdir RelocaTE_output_multiTE_bam
+
+fastq mode:
+python relocaTE.py --fq_dirMSU7.Chr4.ALL.rep1_reads_5X_100_500 --genome_fasta MSU7.Chr4.fa --te_fasta mping.fa --reference_ins MSU7.Chr4.fa.RepeatMasker.out --outdir RelocaTE_output_mPing_gz
 
     '''
     print message
@@ -254,16 +260,28 @@ def main():
         writefile(step5_file, step5_cmd)
         step5_count +=1
     
-    
-    #step6 characterize homozygous, heterozygous and somatic insertion
+    #step6 find transposons on reference: reference only or shared
     createdir('%s/shellscripts/step_6' %(args.outdir))
-    step6_cmd = []
-    step6_cmd.append('cat %s/repeat/results/*.all_nonref_insert.gff > %s/repeat/results/ALL.all_nonref_insert.gff' %(args.outdir, args.outdir))
-    step6_cmd.append('cat %s/repeat/results/*.all_nonref_insert.txt | grep "^TE" -v > %s/repeat/results/ALL.all_nonref_insert.txt' %(args.outdir, args.outdir))
-    step6_cmd.append('perl %s/characterizer.pl -s %s/repeat/results/ALL.all_nonref_insert.txt -b %s -g %s --samtools %s' %(RelocaTE_bin, args.outdir, bam, reference, samtools))
-    step6_file= '%s/shellscripts/step_6/0.repeat.characterize.sh' %(args.outdir)
-    shells.append('sh %s' %(step6_file)) 
-    writefile(step6_file, '\n'.join(step6_cmd))
+    step6_count = 0
+    if mode == 'fastq':
+        for chrs in ids:
+            step6_cmd = 'python %s/relocaTE_absenceFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0 %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.size)
+            step6_file= '%s/shellscripts/step_6/%s.repeat.absence.sh' %(args.outdir, step5_count)
+            shells.append('sh %s' %(step6_file))
+            writefile(step6_file, step6_cmd)
+            step6_count +=1
+    elif mode == 'bam':
+        pass
+ 
+    #step7 characterize homozygous, heterozygous and somatic insertion
+    createdir('%s/shellscripts/step_7' %(args.outdir))
+    step7_cmd = []
+    step7_cmd.append('cat %s/repeat/results/*.all_nonref_insert.gff > %s/repeat/results/ALL.all_nonref_insert.gff' %(args.outdir, args.outdir))
+    step7_cmd.append('cat %s/repeat/results/*.all_nonref_insert.txt | grep "^TE" -v > %s/repeat/results/ALL.all_nonref_insert.txt' %(args.outdir, args.outdir))
+    step7_cmd.append('perl %s/characterizer.pl -s %s/repeat/results/ALL.all_nonref_insert.txt -b %s -g %s --samtools %s' %(RelocaTE_bin, args.outdir, bam, reference, samtools))
+    step7_file= '%s/shellscripts/step_7/0.repeat.characterize.sh' %(args.outdir)
+    shells.append('sh %s' %(step7_file)) 
+    writefile(step7_file, '\n'.join(step7_cmd))
 
     #write script
     writefile('%s/run_these_jobs.sh' %(args.outdir), '\n'.join(shells))
