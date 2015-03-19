@@ -5,6 +5,7 @@ import numpy as np
 import re
 import os
 import argparse
+import glob
 
 def usage():
     test="name"
@@ -28,7 +29,7 @@ def parse_fastq(fq_file):
     with open (fq_file, 'r') as filehd:
         for line in filehd:
             line = line.rstrip()
-            header = line[1:]
+            header = re.split(r' ', line[1:])[0]
             read_t = '1'
             #if s.search(header):
             #    continue
@@ -49,17 +50,20 @@ def parse_fastq(fq_file):
     return data
 
 def parse_fastq_flanking(fq_file):
-    s = re.compile(r':(middle|start|end)')
+    s = re.compile(r'(.*):(middle|start|end)')
     s1= re.compile(r'(\S+)\.[rf]')
     s2= re.compile(r'(\S+)\/[12]')
     fq_dict = defaultdict(lambda : list)
     with open (fq_file, 'r') as filehd:
         for line in filehd:
             line = line.rstrip()
-            header = line[1:]
-            header_to_store = header
+            #header = line[1:]
+            #header_to_store = header
+            header = re.split(r' ', line[1:])[0]
             m = s.search(header)
-            pos = m.groups(0)[0] if m else 'unknown'
+            header_to_store = m.groups(0)[0] if m else header
+            pos = m.groups(0)[1] if m else 'unknown'
+            #print '%s\t%s' %(header_to_store, pos)
             m1 = s1.search(header)
             m2 = s2.search(header)
             if m1:
@@ -83,7 +87,8 @@ def parse_fastq_default(fq_file):
     with open (fq_file, 'r') as filehd:
         for line in filehd:
             line = line.rstrip()
-            header = line[1:]
+            #header = line[1:]
+            header = re.split(r' ', line[1:])[0]
             header_to_store = header
             m1 = s1.search(header)
             m2 = s2.search(header)
@@ -190,7 +195,7 @@ def match_support(fq1_dict, fq2_0, fq2_te, fq1_match, fq2_match, fq_unPaired, fq
     #print cmd
     os.system('%s subseq %s %s > %s' %(seqtk, fq2_0, fq1_id_temp, fq2_0_temp))
     fq2_0_temp_dict = parse_fastq_default(fq2_0_temp)
-    os.system('rm %s %s' %(fq1_id_temp, fq2_0_temp))
+    #os.system('rm %s %s' %(fq1_id_temp, fq2_0_temp))
 
     #write paired and unPaired reads 
     for hd in sorted(fq1_dict.keys()):
@@ -228,10 +233,16 @@ def main():
         usage()
         sys.exit(2)
 
+    fastqs = glob.glob('%s/*.f*q*' %(args.fq_dir)) 
+    suffix = ''
+    s = re.compile(r'(\.f\w*?q.*?$)')
+    if s.search(fastqs[0]):
+        suffix = s.search(fastqs[0]).groups(0)[0]
+
     fq1_te = '%s/%s' %(args.repeat, re.sub(r'.flankingReads.fq', r'.ContainingReads.fq', os.path.split(args.fq1)[1]))
     fq2_te = '%s/%s' %(args.repeat, re.sub(r'.flankingReads.fq', r'.ContainingReads.fq', os.path.split(args.fq2)[1]))
-    fq1_0  = '%s/%s' %(args.fq_dir, re.sub(r'.te_repeat.flankingReads.fq', r'.fq', os.path.split(args.fq1)[1]))
-    fq2_0  = '%s/%s' %(args.fq_dir, re.sub(r'.te_repeat.flankingReads.fq', r'.fq', os.path.split(args.fq2)[1]))
+    fq1_0  = '%s/%s' %(args.fq_dir, re.sub(r'.te_repeat.flankingReads.fq', r'%s' %(suffix), os.path.split(args.fq1)[1]))
+    fq2_0  = '%s/%s' %(args.fq_dir, re.sub(r'.te_repeat.flankingReads.fq', r'%s' %(suffix), os.path.split(args.fq2)[1]))
     fq1_match = '%s.matched' %(args.fq1)
     fq2_match = '%s.matched' %(args.fq2)
     fq_unPaired = '%s.unPaired.fq' %(os.path.splitext(args.fq1)[0])

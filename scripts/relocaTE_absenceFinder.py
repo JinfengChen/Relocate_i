@@ -146,7 +146,7 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
     #READS      = open ('%s/%s.%s.all_ref_reads.list' %(result, usr_target, TE), 'w')
     r = re.compile(r'(\w+):(\d+)-(\d+):(.*)')
     for te_id in sorted(existingTE_found.keys()):
-        #print 'Found: %s' %(te_id)
+        print 'Found: %s' %(te_id)
         ##junction reads
         strand, chro, start, end = ['', '', '', '']
         if r.search(te_id):
@@ -154,6 +154,7 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
             chro   = r.search(te_id).groups(0)[0]
             start  = r.search(te_id).groups(0)[1]
             end    = r.search(te_id).groups(0)[2]
+        print '%s\t%s\t%s\t%s' %(strand, chro, start, end)
         l_count, r_count = [0, 0]
         if strand == '+':
             l_count = len(existingTE_found[te_id]['start'].keys())
@@ -161,26 +162,37 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
         else:
             l_count = len(existingTE_found[te_id]['end'].keys())
             r_count = len(existingTE_found[te_id]['start'].keys())
+        print '%s\t%s' %(l_count, r_count)
         ##reads and events
+        total_supporting_l, left_supporting_l, right_supporting_l, left_reads_l, right_reads_l = [0, 0, 0, '', '']
+        total_supporting_r, left_supporting_r, right_supporting_r, left_reads_r, right_reads_r = [0, 0, 0, '', '']
         reads   = defaultdict(lambda : int())
         event_l = defaultdict(lambda : int())
         event_r = defaultdict(lambda : int())
-        for rd in existingTE_found[te_id]['start'].keys():
-            reads[rd] = 0
-            event_l[existingTE_found[te_id]['start'][rd]] += 1
-        for rd in existingTE_found[te_id]['end'].keys():
-            reads[rd] = 1
-            event_r[existingTE_found[te_id]['end'][rd]] += 1
-        event_l_sorted = OrderedDict(sorted(event_l.items(), key=lambda x:x[1]))
-        event_r_sorted = OrderedDict(sorted(event_r.items(), key=lambda x:x[1]))
-        event_l_top    = event_l_sorted.keys()[-1]
-        event_r_top    = event_r_sorted.keys()[-1]
+        if len(existingTE_found[te_id]['start'].keys()) > 0:
+            for rd in existingTE_found[te_id]['start'].keys():
+                reads[rd] = 0
+                event_l[existingTE_found[te_id]['start'][rd]] += 1
+            event_l_sorted = OrderedDict(sorted(event_l.items(), key=lambda x:x[1]))
+            event_l_top    = event_l_sorted.keys()[-1]
+            total_supporting_l, left_supporting_l, right_supporting_l, left_reads_l, right_reads_l = Supporting_count(event_l_top, start, teSupportingReads)
+        if len(existingTE_found[te_id]['end'].keys()) > 0:
+            for rd in existingTE_found[te_id]['end'].keys():
+                reads[rd] = 1
+                event_r[existingTE_found[te_id]['end'][rd]] += 1
+            event_r_sorted = OrderedDict(sorted(event_r.items(), key=lambda x:x[1]))
+            event_r_top    = event_r_sorted.keys()[-1]
+            total_supporting_r, left_supporting_r, right_supporting_r, left_reads_r, right_reads_r = Supporting_count(event_r_top, str(int(end)+1), teSupportingReads)
+        #event_l_sorted = OrderedDict(sorted(event_l.items(), key=lambda x:x[1]))
+        #event_r_sorted = OrderedDict(sorted(event_r.items(), key=lambda x:x[1]))
+        #event_l_top    = event_l_sorted.keys()[-1]
+        #event_r_top    = event_r_sorted.keys()[-1]
         ##repeat family
         repeat_junction = insertion_family(','.join(reads.keys()), read_repeat)
         #print 'repeat_junction: %s' %(repeat_junction)
         ##supporting reads
-        total_supporting_l, left_supporting_l, right_supporting_l, left_reads_l, right_reads_l = Supporting_count(event_l_top, start, teSupportingReads)
-        total_supporting_r, left_supporting_r, right_supporting_r, left_reads_r, right_reads_r = Supporting_count(event_r_top, str(int(end)+1), teSupportingReads)
+        #total_supporting_l, left_supporting_l, right_supporting_l, left_reads_l, right_reads_l = Supporting_count(event_l_top, start, teSupportingReads)
+        #total_supporting_r, left_supporting_r, right_supporting_r, left_reads_r, right_reads_r = Supporting_count(event_r_top, str(int(end)+1), teSupportingReads)
         #print 'left: t:%s\tl:%s\tr:%s\tl:%s\tr:%s' %(total_supporting_l, left_supporting_l, right_supporting_l, left_reads_l, right_reads_l)
         #print 'right: t:%s\tl:%s\tr:%s\tl:%s\tr:%s' %(total_supporting_r, left_supporting_r, right_supporting_r, left_reads_r, right_reads_r)
         ##output

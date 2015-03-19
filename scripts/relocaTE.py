@@ -239,7 +239,11 @@ def main():
             step3_cmds = '%s\n%s' %(blatcmd, trim)
             writefile(step3_file, step3_cmds)
             step3_count += 1
-            
+        elif not os.path.isfile(flank) or os.path.getsize(flank) == 0:
+            shells.append('sh %s' %(step3_file))
+            step3_cmds = '%s' %(trim)
+            writefile(step3_file, step3_cmds)
+            step3_count += 1
 
     #step4 align TE trimed reads to genome
     ref = os.path.split(os.path.splitext(reference)[0])[1]
@@ -266,7 +270,7 @@ def main():
     if mode == 'fastq':
         for chrs in ids:
             step6_cmd = 'python %s/relocaTE_absenceFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0 %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.size)
-            step6_file= '%s/shellscripts/step_6/%s.repeat.absence.sh' %(args.outdir, step5_count)
+            step6_file= '%s/shellscripts/step_6/%s.repeat.absence.sh' %(args.outdir, step6_count)
             shells.append('sh %s' %(step6_file))
             writefile(step6_file, step6_cmd)
             step6_count +=1

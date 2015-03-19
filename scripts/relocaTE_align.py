@@ -50,28 +50,28 @@ def find_mate_pair_lib(path, mate_file):
     for file0 in flanking_files:
         if os.path.getsize(file0) == 0:
             continue
-        #print file0
+        print file0
         if s_u.search(file0):
-            #print 'unpaired'
+            print 'unpaired'
             files_unpaired.append(file0)
         elif s_1.search(file0):
-            #print 'p1'
+            print 'p1'
             files_1.append(file0)
         elif s_2.search(file0):
-            #print 'p2'
+            print 'p2'
             files_2.append(file0)
     if len(files_1) >= 1 and len(files_2) >= 1:
         for i in range(len(files_1)):
             file1 = files_1[i]
             file1 = re.sub(r'%s\..*' %(mate_file_1), '', file1)
             for j in range(len(files_2)):
-                file2 = files_2[i]
+                file2 = files_2[j]
                 file2 = re.sub(r'%s\..*' %(mate_file_2), '', file2)
                 #print 'file1: %s; file2: %s' %(file1, file2)
                 if file1 == file2:
                     flanking_fq[file1][1] = files_1[i]
-                    flanking_fq[file1][2] = files_2[i]
-                    #print 'pair1: %s; pair2: %s' %(flanking_fq[file1][1], flanking_fq[file1][2])
+                    flanking_fq[file1][2] = files_2[j]
+                    print 'pair1: %s; pair2: %s' %(flanking_fq[file1][1], flanking_fq[file1][2])
                     if len(files_unpaired) >= 1:
                         for k in range(len(files_unpaired)):
                             fileu = files_unpaired[k]
@@ -114,9 +114,11 @@ def map_reads_bwa(scripts, flanking_fq, path, genome_file, fastq_dir, target, bw
         #    bwa_run(path, genome_file, fastq, fq_name, target, 'single')
         #    bwa_out_files.append('%s/bwa_aln/%s.%s.bwa.single.sam' %(path, target, fq_name))
         #map reads as paired, find paired and unpaired and map seperately
+        print 'pre: %s' %(file_pre)
         if flanking_fq[file_pre].has_key(1) and flanking_fq[file_pre].has_key(2):
             fastq1  = flanking_fq[file_pre][1]
             fastq2  = flanking_fq[file_pre][2]
+            print '%s\n%s' %(fastq1, fastq2)
             fq_name = os.path.splitext(os.path.split(fastq1)[1])[0]
             if int(os.path.getsize(fastq1)) > 0 and int(os.path.getsize(fastq2)) > 0:
                 #prepare paired file fastq1.matched, fastq2.matched and *.unPaired.fq
@@ -124,6 +126,7 @@ def map_reads_bwa(scripts, flanking_fq, path, genome_file, fastq_dir, target, bw
                 #cmd = '%s/clean_pairs_memory.pl -1 %s -2 %s 1> %s/flanking_seq/%s.unPaired.fq 2>> %s/%s.stderr' 
                 #%(scripts, fastq1, fastq2, path, fq_name, path, target)
                 cmd = '%s/clean_pairs_memory.py --fq1 %s --fq2 %s --repeat %s/te_containing_fq --fq_dir %s --seqtk %s' %(scripts, fastq1, fastq2, path, fastq_dir, seqtk)
+                print cmd
                 os.system(cmd)
             match1 = '%s.matched' %(fastq1)
             match2 = '%s.matched' %(fastq2)
@@ -132,6 +135,7 @@ def map_reads_bwa(scripts, flanking_fq, path, genome_file, fastq_dir, target, bw
                 #map paired-reads
                 bwa_run_paired(path, genome_file, match1, match2, fq_name, target, bwa)
                 bwa_out_files.append('%s/bwa_aln/%s.%s.bwa.mates.sam' %(path, target, fq_name))
+            if int(os.path.getsize(unpaired) > 0):
                 #map unpaired-reads
                 bwa_run(path, genome_file, unpaired, fq_name, target, 'unPaired', bwa)
                 bwa_out_files.append('%s/bwa_aln/%s.%s.bwa.unPaired.sam' %(path, target, fq_name))
