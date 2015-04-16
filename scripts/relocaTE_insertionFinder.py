@@ -724,12 +724,12 @@ def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
                 #print line
                 #print unit[5], unit[9], unit[12], unit[13], unit[14]
                 if unit[9] == '+':
-                    #for i in range(int(unit[6])-2, int(unit[6])+3):
-                    #    existingTE_inf[unit[5]]['start'][int(i)] = 1
+                    for i in range(int(unit[6])-2, int(unit[6])+3):
+                        existingTE_inf[unit[5]]['start'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7], '1', '+')
                     #print unit[10], 'start', unit[6]
-                    #for i in range(int(unit[7])-2, int(unit[7])+3):
-                    #    existingTE_inf[unit[5]]['end'][int(i)] = 1
+                    for i in range(int(unit[7])-2, int(unit[7])+3):
+                        existingTE_inf[unit[5]]['end'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '+')
                     #print unit[10], 'end', unit[7]
 
@@ -741,12 +741,12 @@ def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
                             intact = 1
                     print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], intact, '+')
                 elif unit[9] == 'C':
-                    #for i in range(int(unit[6])-2, int(unit[6])+3):
-                    #    existingTE_inf[unit[5]]['start'][int(i)] = 1
+                    for i in range(int(unit[6])-2, int(unit[6])+3):
+                        existingTE_inf[unit[5]]['start'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7],'1', '-')
                     #print unit[10], 'start', unit[6]
-                    #for i in range(int(unit[7])-2, int(unit[7])+3):
-                    #    existingTE_inf[unit[5]]['end'][int(i)] = 1
+                    for i in range(int(unit[7])-2, int(unit[7])+3):
+                        existingTE_inf[unit[5]]['end'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '-')
                     #print unit[10], 'end', unit[7]
                     intact = 0
@@ -861,21 +861,21 @@ def TSD_check_single(event, seq, chro, start, real_name, read_repeat, name, TSD,
     #print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
-        if 0:
-            continue
-        #if pos == 'left':
-        #    tir1_end = int(TSD_start)
+        #if 0:
+        #    continue
+        if pos == 'left':
+            tir1_end = int(TSD_start)
         #    print 'tir1: %s' %(tir1_end)
-        #elif pos == 'right':
-        #    tir2_end = int(TSD_start) - 1
+        elif pos == 'right':
+            tir2_end = int(TSD_start) - 1
         #    print 'tir2: %s' %(tir2_end)
-        #if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
-        #    te_id = existingTE_inf[chro]['start'][tir1_end]
-        #    #existingTE_found[te_id]['start'] += 1
+        if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
+            te_id = existingTE_inf[chro]['start'][tir1_end]
+        #    existingTE_found[te_id]['start'] += 1
         #    print 'tir1'
-        #elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
-        #    te_id = existingTE_inf[chro]['end'][tir2_end]
-        #    #existingTE_found[te_id]['end'] += 1
+        elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
+            te_id = existingTE_inf[chro]['end'][tir2_end]
+        #    existingTE_found[te_id]['end'] += 1
         #    print 'tir2'
         else:
             #print 'not match'
@@ -938,18 +938,18 @@ def TSD_check(event, seq, chro, start, real_name, read_repeat, name, TSD, strand
         tir1_end, tir2_end = [0, 0]
         if 0:
             continue
-        #if pos == 'left':
-        #    tir1_end = int(start) + len(seq)
+        if pos == 'left':
+            tir1_end = int(start) + len(seq)
         #    print 'tir1: %s' %(tir1_end)
-        #elif pos == 'right':
-        #    tir2_end = int(start) - 1
+        elif pos == 'right':
+            tir2_end = int(start) - 1
         #    print 'tir2: %s' %(tir2_end)
-        #if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
-        #    te_id = existingTE_inf[chro]['start'][tir1_end]
+        if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
+            te_id = existingTE_inf[chro]['start'][tir1_end]
         #    #existingTE_found[te_id]['start'] += 1
         #    print 'tir1'
-        #elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
-        #    te_id = existingTE_inf[chro]['end'][tir2_end]
+        elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
+            te_id = existingTE_inf[chro]['end'][tir2_end]
         #    #existingTE_found[te_id]['end'] += 1
         #    print 'tir2'
         else:
