@@ -715,7 +715,7 @@ def existingTE(infile, existingTE_inf, existingTE_found):
 
 
 def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
-    ofile_RM = open('%s/existingTE.bed' %(top_dir), 'w')
+    #ofile_RM = open('%s/existingTE.bed' %(top_dir), 'w')
     with open (infile, 'r') as filehd:
         for line in filehd:
             line = line.rstrip()
@@ -734,12 +734,12 @@ def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
                     #print unit[10], 'end', unit[7]
 
                     ##if this repeat is a intact element
-                    intact = 0
-                    if int(unit[12]) == 1 and len(unit[14]) == 3:
-                        unit[14] =re.sub(r'\(|\)', '', unit[14])
-                        if int(unit[14]) == 0:
-                            intact = 1
-                    print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], intact, '+')
+                    #intact = 0
+                    #if int(unit[12]) == 1 and len(unit[14]) == 3:
+                    #    unit[14] =re.sub(r'\(|\)', '', unit[14])
+                    #    if int(unit[14]) == 0:
+                    #        intact = 1
+                    #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], intact, '+')
                 elif unit[9] == 'C':
                     for i in range(int(unit[6])-2, int(unit[6])+3):
                         existingTE_inf[unit[5]]['start'][int(i)] = 1
@@ -749,13 +749,13 @@ def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
                         existingTE_inf[unit[5]]['end'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '-')
                     #print unit[10], 'end', unit[7]
-                    intact = 0
-                    if int(unit[14]) == 1 and len(unit[12]) == 3:
-                        unit[12] =re.sub(r'\(|\)', '', unit[12])
-                        if int(unit[12]) == 0:
-                            intact = 1
-                    print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], intact, '-')
-    ofile_RM.close()
+                    #intact = 0
+                    #if int(unit[14]) == 1 and len(unit[12]) == 3:
+                    #    unit[12] =re.sub(r'\(|\)', '', unit[12])
+                    #    if int(unit[12]) == 0:
+                    #        intact = 1
+                    #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], intact, '-')
+    #ofile_RM.close()
 
 def existingTE_RM(top_dir, infile, existingTE_inf):
     r_end = re.compile(r'\((\d+)\)')
