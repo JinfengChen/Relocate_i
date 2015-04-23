@@ -75,6 +75,8 @@ def existingTE_RM_ALL(top_dir, infile):
             line = line.rstrip()
             if len(line) > 2: 
                 unit = re.split(r'\s+',line)
+                if not unit[0] == '':
+                    unit.insert(0, '')
                 #print line
                 #print unit[5], unit[9], unit[12], unit[13], unit[14]
                 if unit[9] == '+':
