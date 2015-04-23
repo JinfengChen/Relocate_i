@@ -373,8 +373,8 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
     READS.close()
     txt2gff(nonref, nonref_gff, 'Non-reference, not found in reference')
     txt2gff(nonsup, nonsup_gff, 'Non-reference, not found in reference')
-    if os.path.isfile(nonsup_gff) and os.path.getsize(nonsup_gff) > 0:
-        os.system('%s intersect -v -a %s -b %s >> %s' %(bedtools, nonsup_gff, existingTE_bed, nonref_gff))
+    #if os.path.isfile(nonsup_gff) and os.path.getsize(nonsup_gff) > 0:
+    #    os.system('%s intersect -v -a %s -b %s >> %s' %(bedtools, nonsup_gff, existingTE_bed, nonref_gff))
 
 def read_direction(strands):
     plus  = 0
@@ -721,17 +721,19 @@ def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
             line = line.rstrip()
             if len(line) > 2: 
                 unit = re.split(r'\s+',line)
-                #print line
-                #print unit[5], unit[9], unit[12], unit[13], unit[14]
+                if not unit[0] == '':
+                    unit.insert(0, '')
+                print line
+                print unit[6], unit[7], unit[9], unit[12], unit[13], unit[14]
                 if unit[9] == '+':
                     for i in range(int(unit[6])-2, int(unit[6])+3):
                         existingTE_inf[unit[5]]['start'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7], '1', '+')
-                    #print unit[10], 'start', unit[6]
+                        print unit[10], 'start', unit[6]
                     for i in range(int(unit[7])-2, int(unit[7])+3):
                         existingTE_inf[unit[5]]['end'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '+')
-                    #print unit[10], 'end', unit[7]
+                        print unit[10], 'end', unit[7]
 
                     ##if this repeat is a intact element
                     #intact = 0
@@ -744,11 +746,11 @@ def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
                     for i in range(int(unit[6])-2, int(unit[6])+3):
                         existingTE_inf[unit[5]]['start'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])-2), str(int(unit[6])+2), unit[11],unit[6],unit[7],'1', '-')
-                    #print unit[10], 'start', unit[6]
+                        print unit[10], 'start', unit[6]
                     for i in range(int(unit[7])-2, int(unit[7])+3):
                         existingTE_inf[unit[5]]['end'][int(i)] = 1
                     #print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[7])-2), str(int(unit[7])+2), unit[11],unit[6],unit[7], '1', '-')
-                    #print unit[10], 'end', unit[7]
+                        print unit[10], 'end', unit[7]
                     #intact = 0
                     #if int(unit[14]) == 1 and len(unit[12]) == 3:
                     #    unit[12] =re.sub(r'\(|\)', '', unit[12])
@@ -828,7 +830,7 @@ def TSD_check_single(event, seq, chro, start, real_name, read_repeat, name, TSD,
     r3 = re.compile(r'end:[53]$')
     #r5_tsd = re.compile(r'^(%s)' %(TSD))
     #r3_tsd = re.compile(r'(%s)$' %(TSD))
-    #print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    print 'TSD_check_single\t%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     ##start means that the TE was removed from the start of the read
     ##5 means the trimmed end mapps to the 5prime end of the TE
     ##3 means the trimmed end mapps to the 3prime end of the TE
@@ -858,27 +860,27 @@ def TSD_check_single(event, seq, chro, start, real_name, read_repeat, name, TSD,
             pos       = 'right'
             TE_orient = '-' if name[-1] == '5' else '+'
             TSD_start = int(start)
-    #print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
         #if 0:
         #    continue
         if pos == 'left':
             tir1_end = int(TSD_start)
-        #    print 'tir1: %s' %(tir1_end)
+            print 'tir1: %s' %(tir1_end)
         elif pos == 'right':
             tir2_end = int(TSD_start) - 1
-        #    print 'tir2: %s' %(tir2_end)
+            print 'tir2: %s' %(tir2_end)
         if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
             te_id = existingTE_inf[chro]['start'][tir1_end]
         #    existingTE_found[te_id]['start'] += 1
-        #    print 'tir1'
+            print 'tir1'
         elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
             te_id = existingTE_inf[chro]['end'][tir2_end]
         #    existingTE_found[te_id]['end'] += 1
-        #    print 'tir2'
+            print 'tir2'
         else:
-            #print 'not match'
+            print 'not match'
             ##non reference insertions
             teInsertions[event][TSD_start][TSD_seq]['count']   += 1   ## total junction reads
             teInsertions[event][TSD_start][TSD_seq][pos]       += 1   ## right/left junction reads
@@ -886,7 +888,7 @@ def TSD_check_single(event, seq, chro, start, real_name, read_repeat, name, TSD,
             #read_name = re.sub(r':start|:end', '', name)
             teInsertions_reads[event][TSD_start][TSD_seq]['read'].append(name)
             #print '1: %s\t 2: %s' %(read_name, teInsertions_reads[event][TSD_seq][TSD_start]['read'])
-            #print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
+            print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
 
 def TSD_check(event, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
     ##TSD already specified by usr, not unknown
@@ -903,7 +905,7 @@ def TSD_check(event, seq, chro, start, real_name, read_repeat, name, TSD, strand
     r3 = re.compile(r'end:[53]$')
     r5_tsd = re.compile(r'^(%s)' %(TSD))
     r3_tsd = re.compile(r'(%s)$' %(TSD))
-    #print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    print 'TSD_check\t%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     ##start means that the TE was removed from the start of the read
     ##5 means the trimmed end mapps to the 5prime end of the TE
     ##3 means the trimmed end mapps to the 3prime end of the TE
@@ -933,25 +935,25 @@ def TSD_check(event, seq, chro, start, real_name, read_repeat, name, TSD, strand
             pos       = 'right'
             TE_orient = '-' if name[-1] == '5' else '+'
             TSD_start = int(start)
-    #print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
         if 0:
             continue
         if pos == 'left':
             tir1_end = int(start) + len(seq)
-        #    print 'tir1: %s' %(tir1_end)
+            print 'tir1: %s' %(tir1_end)
         elif pos == 'right':
             tir2_end = int(start) - 1
-        #    print 'tir2: %s' %(tir2_end)
+            print 'tir2: %s' %(tir2_end)
         if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
             te_id = existingTE_inf[chro]['start'][tir1_end]
         #    #existingTE_found[te_id]['start'] += 1
-        #    print 'tir1'
+            print 'tir1'
         elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
             te_id = existingTE_inf[chro]['end'][tir2_end]
         #    #existingTE_found[te_id]['end'] += 1
-        #    print 'tir2'
+            print 'tir2'
         else:
             #print 'not match'
             ##non reference insertions
@@ -961,7 +963,7 @@ def TSD_check(event, seq, chro, start, real_name, read_repeat, name, TSD, strand
             #read_name = re.sub(r':start|:end', '', name)
             teInsertions_reads[event][TSD_start][TSD_seq]['read'].append(name)
             #print '1: %s\t 2: %s' %(read_name, teInsertions_reads[event][TSD_seq][TSD_start]['read'])
-            #print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
+            print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
 
 def convert_tag(tag):
     tags = {}
