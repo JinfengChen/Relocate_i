@@ -167,12 +167,14 @@ def main():
     parser.add_argument('-d', '--fq_dir')
     parser.add_argument('-g', '--genome_fasta')
     parser.add_argument('-r', '--reference_ins')
-    parser.add_argument('-f', '--fastmap')
     parser.add_argument('-o', '--outdir')
-    parser.add_argument('-s', '--size')
-    parser.add_argument('-c', '--cpu')
-    parser.add_argument('--step')
-    parser.add_argument('--run')
+    parser.add_argument('-s', '--size', default='500', type=int)
+    parser.add_argument('-c', '--cpu', default='1', type=int)
+    parser.add_argument('--len_cut_match', default='10', type=int)
+    parser.add_argument('--len_cut_trim', default='10', type=int)
+    parser.add_argument('--mismatch', default='0', type=int)
+    parser.add_argument('--step', default='1234567', type=str)
+    parser.add_argument('--run', dest='run', action='store_true')
     parser.add_argument('-v', dest='verbose', action='store_true')
     args = parser.parse_args()
     
@@ -223,11 +225,6 @@ def main():
     if args.cpu is None:
         args.cpu  = 1
     
-    if args.run is None:
-        args.run  = 0
-    else:
-        args.run = int(args.run)
-
     if args.step is None:
         args.step = '1234567'
 
@@ -309,7 +306,7 @@ def main():
             writefile(step0_file, existingTE_blat)
 
     #run job in this script
-    if args.run == 1 and len(shells_step0) > 0 and '1' in list(args.step):
+    if args.run and len(shells_step0) > 0 and '1' in list(args.step):
         single_run(shells_step0)
 
     #step1 format reference genome
@@ -344,8 +341,11 @@ def main():
                 writefile(step2_file, '')
         
         #run job in this script
-        if args.run == 1 and len(shells_step2) > 0 and '2' in list(args.step):
-            mp_pool(shells_step2, int(args.cpu))
+        if args.run and len(shells_step2) > 0 and '2' in list(args.step):
+            if int(args.cpu) == 1:
+                single_run(shells_step2)
+            else:
+                mp_pool(shells_step2, int(args.cpu))
  
     elif mode == 'bam':
         #print 'Add module of obtaining reads from bam then prepare as fa files'
@@ -379,7 +379,7 @@ def main():
                 writefile(step2_file, '')
 
         #run job in this script
-        if args.run == 1 and len(shells_step2) > 0 and '2' in list(args.step):
+        if args.run and len(shells_step2) > 0 and '2' in list(args.step):
             single_run(shells_step2)   
 
     #step3 blat fasta to repeat
@@ -393,10 +393,8 @@ def main():
         blatout = '%s/repeat/blat_output/%s.te_repeat.blatout' %(args.outdir, fa_prefix)
         blatstd = '%s/repeat/blat_output/blat.out' %(args.outdir)
         blatcmd = '%s -minScore=10 -tileSize=7 %s %s %s 1>>%s 2>>%s' %(blat ,te_fasta, fa, blatout, blatstd, blatstd)
-        #if args.fastmap is not None:
-        #    blat = 'blat -minScore=10 -tileSize=7 -fastMap %s %s %s 1>> %s' %(te_fasta, fa, blatout, blatstd)
         flank= '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fa_prefix)
-        trim = 'python %s/relocaTE_trim.py %s %s 10 1 > %s' %(RelocaTE_bin, blatout, fq, flank)
+        trim = 'python %s/relocaTE_trim.py %s %s %s %s %s > %s' %(RelocaTE_bin, blatout, fq, args.len_cut_match, args.len_cut_trim, args.mismatch, flank)
         step3_file = '%s/shellscripts/step_3/%s.te_repeat.blat.sh' %(args.outdir, step3_count)
         if not os.path.isfile(blatout) or os.path.getsize(blatout) == 0:
             if '3' in list(args.step):
@@ -414,8 +412,11 @@ def main():
                 step3_count += 1
        
     #run job in this script
-    if args.run == 1 and len(shells_step3) > 0 and '3' in list(args.step):
-        mp_pool(shells_step3, int(args.cpu)) 
+    if args.run and len(shells_step3) > 0 and '3' in list(args.step):
+        if int(args.cpu) == 1:
+            single_run(shells_step3)
+        else:
+            mp_pool(shells_step3, int(args.cpu)) 
 
 
     #step4 align TE trimed reads to genome
@@ -430,7 +431,7 @@ def main():
         writefile(step4_file, step4_cmd)
     
     #run job in this script
-    if args.run == 1 and len(shells_step4) > 0 and '4' in list(args.step):
+    if args.run and len(shells_step4) > 0 and '4' in list(args.step):
         single_run(shells_step4)
 
    
@@ -459,8 +460,11 @@ def main():
             step5_count +=1
     
     #run job in this script
-    if args.run == 1 and len(shells_step5) > 0 and '5' in list(args.step):
-        mp_pool(shells_step5, int(args.cpu))   
+    if args.run and len(shells_step5) > 0 and '5' in list(args.step):
+        if int(args.cpu) == 1:
+            single_run(shells_step5)
+        else:
+            mp_pool(shells_step5, int(args.cpu))   
 
 
     #step6 find transposons on reference: reference only or shared
@@ -478,8 +482,11 @@ def main():
                 step6_count +=1
         
         #run job in this script
-        if args.run == 1 and len(shells_step6) > 0 and '6' in list(args.step):
-            mp_pool(shells_step6, int(args.cpu))   
+        if args.run and len(shells_step6) > 0 and '6' in list(args.step):
+            if int(args.cpu) == 1:
+                single_run(shells_step6)
+            else:
+                mp_pool(shells_step6, int(args.cpu))   
         
     elif mode == 'bam':
         pass
@@ -501,7 +508,7 @@ def main():
         writefile(step7_file, '\n'.join(step7_cmd))
    
     #run job in this script
-    if args.run == 1 and len(shells_step7) > 0 and '7' in list(args.step):
+    if args.run and len(shells_step7) > 0 and '7' in list(args.step):
         single_run(shells_step7)
     
 
