@@ -11,12 +11,13 @@ import gzip
 def usage():
     test="name"
     message='''
-python relocaTE_trim.py te_repeat.blatout 500_1.fq 10 0
+python relocaTE_trim.py te_repeat.blatout 500_1.fq 10 10 0
 
 sys.argv[1]: blatout or bam
 sys.argv[2]: fastq
-sys.argv[3]: length cutoff for trimmed fastq
-sys.argv[4]: mismatch allowance: mismatch/(mismatch+match) <= mismatch allowance
+sys.argv[3]: length cutoff for matched region
+sys.argv[4]: length cutoff for trimmed fastq
+sys.argv[5]: mismatch allowance: 0,1,2,3 mismatch allowed on reads and repeat alignment
 
 Parse blat or bam file. Write TE matched reads and their pairs into files.
 *.te_repeat.flankingReads.fq: trimmed reads without TE and reads matched to the middle of TE
@@ -99,10 +100,11 @@ def main():
         usage()
         sys.exit(2)
 
-    align_file = sys.argv[1]
-    fq_file1   = sys.argv[2]
-    len_cutoff = int(sys.argv[3])
-    mismatch_allowance = float(sys.argv[4])
+    align_file   = sys.argv[1]
+    fq_file1     = sys.argv[2]
+    len_cutoff_m = int(sys.argv[3])
+    len_cutoff_l = int(sys.argv[4])
+    mismatch_allowance = int(sys.argv[5])
     align_type = 'bam' if os.path.splitext(align_file)[1].replace(r'.', '') == 'bam' else 'blat'
   
     #set output directories and files
@@ -191,7 +193,8 @@ def main():
                     #print 'check2: %s\t%s\t%s'  %(str(tStart), str((length - (match + mismatch))), str((mismatch/(match + mismatch))))
                     ##query read overlaps 5' end of database TE & trimmed seq > cutoff
                     #int(start) <= 2 or int(end) >= int(length) - 3, we need the reads mapped boundary to align with te
-                    if tStart == 0 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
+                    #if tStart == 0 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
+                    if tStart == 0 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) >= len_cutoff_m and int(mismatch)  <= int(mismatch_allowance):
                         tS = int(tStart) + 1
                         tE = int(tEnd) + 1
                         qS = int(start) + 1
@@ -216,11 +219,12 @@ def main():
                             seq_id   = '%s:end:5' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
                         #print '1: trimmed: %s %s' %(trimmed_seq, str(end))
-                        if len(trimmed_seq) >= len_cutoff:
+                        if len(trimmed_seq) >= len_cutoff_l:
                             print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand)
                             print >> ofile_te5, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
                     #query read overlaps 3' end of database TE & trimmed seq > cutoff
-                    elif tEnd == tLen - 1 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
+                    #elif tEnd == tLen - 1 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
+                    elif tEnd == tLen - 1 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff_m and int(mismatch) <= int(mismatch_allowance):
                         tS = int(tStart) + 1
                         tE = int(tEnd) + 1
                         qS = int(start) + 1
@@ -242,12 +246,13 @@ def main():
                             seq_id   = '%s:start:3' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
                         #print '2: trimmed: %s %s' %(trimmed_seq, str(end))
-                        if len(trimmed_seq) >= len_cutoff:
+                        if len(trimmed_seq) >= len_cutoff_l:
                             print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand)
                             print >> ofile_te3, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
                     #query read overlaps internal of database TE, no need to trim. These reads pairs will be used as supporting reads
                     #in relocate_align, we get the reads in trimmed files and their pairs.
-                    elif start == 0 and end + 1 == length and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
+                    #elif start == 0 and end + 1 == length and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
+                    elif start == 0 and end + 1 == length and int(mismatch) <= int(mismatch_allowance):
                         trimmed_seq = seq
                         trimmed_qual= qual
                         seq_id   = header
@@ -257,7 +262,7 @@ def main():
                         print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand) 
                         #print '3: trimmed: %s %s' %(trimmed_seq, str(end))
                     ##trimmed reads
-                    if len(trimmed_seq) >= len_cutoff:
+                    if len(trimmed_seq) >= len_cutoff_l:
                         print '@%s\n%s\n%s\n%s' %(header, trimmed_seq, qualh, trimmed_qual)
                     ##any read that was in the blat file is written here
                     print >> ofile_fq, '@%s\n%s\n%s\n%s' %(header, seq, qualh, qual)
