@@ -113,6 +113,53 @@ def existingTE_RM_ALL(top_dir, infile):
                     print >> ofile_RM, '%s\t%s\t%s\t%s:%s-%s\t%s\t%s' %(unit[5], str(int(unit[6])), str(int(unit[7])), unit[11],unit[6],unit[7], intact, '-')
     ofile_RM.close()
 
+#Chr3	not.give	RelocaTE_i	283493	283504	.	-	.	ID=repeat_Chr3_283493_283504;TSD=ATGCCATCAAGG;Note=Non-reference,
+#not found in reference;Right_junction_reads:4;Left_junction_reads:1;Right_support_reads:4;Left_support_reads:5;
+#Chr3	281479	284272	TE110112	+
+def Overlap_TE_boundary(prefix, refte):
+    data = defaultdict(str)
+    final_gff   = '%s.gff' %(prefix)
+    raw_gff     = '%s.raw.gff' %(prefix)
+    clean_gff   = '%s.clean.gff' %(prefix)
+    infile = '%s.overlap' %(prefix)
+    outfile= '%s.remove.gff' %(prefix)
+    os.system('bedtools window -w 10 -a %s -b %s > %s' %(final_gff, refte, infile))
+    if not os.path.isfile(infile) or not os.path.getsize(infile) > 0:
+        return 1 
+    ofile  = open(outfile, 'w') 
+    with open (infile, 'r') as filehd:
+        for line in filehd:
+            line = line.rstrip()
+            if len(line) > 2: 
+                unit = re.split(r'\t',line)
+                temp = defaultdict(str)
+                attrs = re.split(r';', unit[8])
+                for attr in attrs:
+                    if not attr == '':
+                        attr = re.sub(r':', '=', attr)
+                        idx, value = re.split(r'\=', attr)
+                        temp[idx] = value
+                if int(temp['Right_junction_reads']) == 0 or int(temp['Left_junction_reads']) == 0:
+                    #support by one junction
+                    #within 10 bp interval of intact TE boundary
+                    #print >> ofile, '\t'.join(unit[:9])
+                    if int(unit[3]) >= int(unit[10]) - 10 and int(unit[3]) <= int(unit[10]) + 10:
+                        print >> ofile, '\t'.join(unit[:9])
+                    elif int(unit[3]) >= int(unit[11]) - 10 and int(unit[3]) <= int(unit[11]) + 10:
+                        print >> ofile, '\t'.join(unit[:9])
+                    elif int(unit[4]) >= int(unit[10]) - 10 and int(unit[4]) <= int(unit[10]) + 10:
+                        print >> ofile, '\t'.join(unit[:9])
+                    elif int(unit[4]) >= int(unit[11]) - 10 and int(unit[4]) <= int(unit[11]) + 10:
+                        print >> ofile, '\t'.join(unit[:9])
+    ofile.close()
+    if not os.path.isfile(outfile) or not os.path.getsize(outfile) > 0:
+        return 1
+    os.system('bedtools intersect -v -a %s -b %s > %s' %(final_gff, outfile, clean_gff))
+    os.system('mv %s %s' %(final_gff, raw_gff))
+    os.system('grep -v \"singleton\|insufficient_data\" %s > %s' %(clean_gff, final_gff))
+    os.system('rm %s.overlap %s.remove.gff %s.clean.gff' %(prefix, prefix, prefix))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-b', '--bam')
@@ -124,6 +171,7 @@ def main():
     parser.add_argument('-o', '--outdir')
     parser.add_argument('-s', '--size')
     parser.add_argument('-c', '--cpu')
+    parser.add_argument('--step')
     parser.add_argument('--run')
     parser.add_argument('-v', dest='verbose', action='store_true')
     args = parser.parse_args()
@@ -179,6 +227,9 @@ def main():
         args.run  = 0
     else:
         args.run = int(args.run)
+
+    if args.step is None:
+        args.step = '1234567'
 
     samtools = ''
     bedtools = ''
@@ -240,22 +291,25 @@ def main():
     reference_ins_flag = 'NONE'
     if args.reference_ins is None or args.reference_ins == '0':
         step0_file = '%s/shellscripts/step_0_do_not_call_reference_insertions' %(args.outdir)
-        writefile(step0_file, '')
+        if '1' in list(args.step):
+            writefile(step0_file, '')
     elif os.path.isfile(args.reference_ins):
         step0_file = '%s/shellscripts/step_0_te_annotation_provided' %(args.outdir)
         reference_ins_flag = args.reference_ins
-        writefile(step0_file, '')
+        if '1' in list(args.step):
+            writefile(step0_file, '')
     elif args.reference_ins == '1':
         createdir('%s/shellscripts/step_0' %(args.outdir))
         step0_file = '%s/shellscripts/step_0/step_0.existingTE_blat.sh' %(args.outdir)
-        shells.append('sh %s' %(step0_file))
-        shells_step0.append('sh %s' %(step0_file))
-        existingTE_blat = '%s %s %s %s/existingTE.blatout 1> %s/existingTE.blat.stdout' %(blat, reference, te_fasta, args.outdir, args.outdir)
-        reference_ins_flag = '%s/existingTE.blatout' %(args.outdir)
-        writefile(step0_file, existingTE_blat)
+        if '1' in list(args.step):
+            shells.append('sh %s' %(step0_file))
+            shells_step0.append('sh %s' %(step0_file))
+            existingTE_blat = '%s %s %s %s/existingTE.blatout 1> %s/existingTE.blat.stdout' %(blat, reference, te_fasta, args.outdir, args.outdir)
+            reference_ins_flag = '%s/existingTE.blatout' %(args.outdir)
+            writefile(step0_file, existingTE_blat)
 
     #run job in this script
-    if args.run == 1 and len(shells_step0) > 0:
+    if args.run == 1 and len(shells_step0) > 0 and '1' in list(args.step):
         single_run(shells_step0)
 
     #step1 format reference genome
@@ -278,17 +332,19 @@ def main():
                 createdir('%s/shellscripts/step_2' %(args.outdir))
                 fq2fa = '%s seq -A %s > %s' %(seqtk, fq, fa)
                 step2_file = '%s/shellscripts/step_2/%s.fq2fa.sh' %(args.outdir, step2_count)
-                shells.append('sh %s' %(step2_file))
-                shells_step2.append('sh %s' %(step2_file))
-                writefile(step2_file, fq2fa)
+                if '2' in list(args.step):
+                    shells.append('sh %s' %(step2_file))
+                    shells_step2.append('sh %s' %(step2_file))
+                    writefile(step2_file, fq2fa)
                 step2_flag == 1
                 step2_count += 1
         if step2_flag == 0:
             step2_file = '%s/shellscripts/step_2_not_needed_fq_already_converted_2_fa' %(args.outdir)
-            writefile(step2_file, '')
+            if '2' in list(args.step):
+                writefile(step2_file, '')
         
         #run job in this script
-        if args.run == 1 and len(shells_step2) > 0:
+        if args.run == 1 and len(shells_step2) > 0 and '2' in list(args.step):
             mp_pool(shells_step2, int(args.cpu))
  
     elif mode == 'bam':
@@ -313,15 +369,17 @@ def main():
         if not os.path.isfile(fa1) and not os.path.isfile(fa2):
             createdir('%s/shellscripts/step_2' %(args.outdir))
             step2_file = '%s/shellscripts/step_2/0.bam2fa.sh' %(args.outdir)
-            shells.append('sh %s' %(step2_file))
-            shells_step2.append('sh %s' %(step2_file))
-            writefile(step2_file, '\n'.join(cmd_step2))
+            if '2' in list(args.step):
+                shells.append('sh %s' %(step2_file))
+                shells_step2.append('sh %s' %(step2_file))
+                writefile(step2_file, '\n'.join(cmd_step2))
         else:
             step2_file = '%s/shellscripts/step_2_not_needed_fq_already_converted_2_fa' %(args.outdir)
-            writefile(step2_file, '')
+            if '2' in list(args.step):
+                writefile(step2_file, '')
 
         #run job in this script
-        if args.run == 1 and len(shells_step2) > 0:
+        if args.run == 1 and len(shells_step2) > 0 and '2' in list(args.step):
             single_run(shells_step2)   
 
     #step3 blat fasta to repeat
@@ -341,20 +399,22 @@ def main():
         trim = 'python %s/relocaTE_trim.py %s %s 10 1 > %s' %(RelocaTE_bin, blatout, fq, flank)
         step3_file = '%s/shellscripts/step_3/%s.te_repeat.blat.sh' %(args.outdir, step3_count)
         if not os.path.isfile(blatout) or os.path.getsize(blatout) == 0:
-            shells.append('sh %s' %(step3_file))
-            shells_step3.append('sh %s' %(step3_file))
-            step3_cmds = '%s\n%s' %(blatcmd, trim)
-            writefile(step3_file, step3_cmds)
-            step3_count += 1
+            if '3' in list(args.step):
+                shells.append('sh %s' %(step3_file))
+                shells_step3.append('sh %s' %(step3_file))
+                step3_cmds = '%s\n%s' %(blatcmd, trim)
+                writefile(step3_file, step3_cmds)
+                step3_count += 1
         elif not os.path.isfile(flank) or os.path.getsize(flank) == 0:
-            shells.append('sh %s' %(step3_file))
-            shells_step3.append('sh %s' %(step3_file))
-            step3_cmds = '%s' %(trim)
-            writefile(step3_file, step3_cmds)
-            step3_count += 1
+            if '3' in list(args.step):
+                shells.append('sh %s' %(step3_file))
+                shells_step3.append('sh %s' %(step3_file))
+                step3_cmds = '%s' %(trim)
+                writefile(step3_file, step3_cmds)
+                step3_count += 1
        
     #run job in this script
-    if args.run == 1 and len(shells_step3) > 0:
+    if args.run == 1 and len(shells_step3) > 0 and '3' in list(args.step):
         mp_pool(shells_step3, int(args.cpu)) 
 
 
@@ -363,13 +423,14 @@ def main():
     ref = os.path.split(os.path.splitext(reference)[0])[1]
     createdir('%s/shellscripts/step_4' %(args.outdir))
     step4_file= '%s/shellscripts/step_4/step_4.%s.repeat.align.sh' %(args.outdir, ref)
-    shells.append('sh %s' %(step4_file))
-    shells_step4.append('sh %s' %(step4_file))
-    step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, fastq_dir, args.outdir)
-    writefile(step4_file, step4_cmd)
+    if '4' in list(args.step):
+        shells.append('sh %s' %(step4_file))
+        shells_step4.append('sh %s' %(step4_file))
+        step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, fastq_dir, args.outdir)
+        writefile(step4_file, step4_cmd)
     
     #run job in this script
-    if args.run == 1 and len(shells_step4) > 0:
+    if args.run == 1 and len(shells_step4) > 0 and '4' in list(args.step):
         single_run(shells_step4)
 
    
@@ -391,13 +452,14 @@ def main():
     for chrs in ids:
         step5_cmd = 'python %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0 %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.size)
         step5_file= '%s/shellscripts/step_5/%s.repeat.findSites.sh' %(args.outdir, step5_count)
-        shells.append('sh %s' %(step5_file))
-        shells_step5.append('sh %s' %(step5_file))
-        writefile(step5_file, step5_cmd)
-        step5_count +=1
+        if '5' in list(args.step):
+            shells.append('sh %s' %(step5_file))
+            shells_step5.append('sh %s' %(step5_file))
+            writefile(step5_file, step5_cmd)
+            step5_count +=1
     
     #run job in this script
-    if args.run == 1 and len(shells_step5) > 0:
+    if args.run == 1 and len(shells_step5) > 0 and '5' in list(args.step):
         mp_pool(shells_step5, int(args.cpu))   
 
 
@@ -409,13 +471,14 @@ def main():
         for chrs in ids:
             step6_cmd = 'python %s/relocaTE_absenceFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0 %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.size)
             step6_file= '%s/shellscripts/step_6/%s.repeat.absence.sh' %(args.outdir, step6_count)
-            shells.append('sh %s' %(step6_file))
-            shells_step6.append('sh %s' %(step6_file))
-            writefile(step6_file, step6_cmd)
-            step6_count +=1
+            if '6' in list(args.step):
+                shells.append('sh %s' %(step6_file))
+                shells_step6.append('sh %s' %(step6_file))
+                writefile(step6_file, step6_cmd)
+                step6_count +=1
         
         #run job in this script
-        if args.run == 1 and len(shells_step6) > 0:
+        if args.run == 1 and len(shells_step6) > 0 and '6' in list(args.step):
             mp_pool(shells_step6, int(args.cpu))   
         
     elif mode == 'bam':
@@ -426,17 +489,19 @@ def main():
     createdir('%s/shellscripts/step_7' %(args.outdir))
     step7_cmd = []
     step7_cmd.append('cat %s/repeat/results/*.all_nonref_insert.gff > %s/repeat/results/ALL.all_nonref_insert.gff' %(args.outdir, args.outdir))
+    step7_cmd.append('python %s/clean_false_positive.py --input %s/repeat/results/ALL.all_nonref_insert.gff --refte %s/existingTE.bed' %(RelocaTE_bin, args.outdir, top_dir))
     step7_cmd.append('cat %s/repeat/results/*.all_nonref_insert.txt | grep "^TE" -v > %s/repeat/results/ALL.all_nonref_insert.txt' %(args.outdir, args.outdir))
     step7_cmd.append('cat %s/repeat/results/*.all_ref_insert.txt > %s/repeat/results/ALL.all_ref_insert.txt' %(args.outdir, args.outdir))
     step7_cmd.append('cat %s/repeat/results/*.all_ref_insert.gff > %s/repeat/results/ALL.all_ref_insert.gff' %(args.outdir, args.outdir))
     step7_cmd.append('perl %s/characterizer.pl -s %s/repeat/results/ALL.all_nonref_insert.txt -b %s -g %s --samtools %s' %(RelocaTE_bin, args.outdir, bam, reference, samtools))
     step7_file= '%s/shellscripts/step_7/0.repeat.characterize.sh' %(args.outdir)
-    shells.append('sh %s' %(step7_file))
-    shells_step7.append('sh %s' %(step7_file)) 
-    writefile(step7_file, '\n'.join(step7_cmd))
+    if '7' in list(args.step):
+        shells.append('sh %s' %(step7_file))
+        shells_step7.append('sh %s' %(step7_file)) 
+        writefile(step7_file, '\n'.join(step7_cmd))
    
     #run job in this script
-    if args.run == 1 and len(shells_step7) > 0:
+    if args.run == 1 and len(shells_step7) > 0 and '7' in list(args.step):
         single_run(shells_step7)
     
 
