@@ -135,7 +135,7 @@ def insertion_family(reads, read_repeat):
     else:
         return ''
 
-def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size):
+def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size, teLowQualityReads):
     createdir(result)
     ###remove insertion 
     existingTE_bed = '%s/existingTE.bed' %('/'.join(top_dir))
@@ -170,7 +170,11 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
             TE_orient, repeat_junction = ['','']
             TE_orient_foward, TE_orient_reverse    = [0,0]
             total_count, left_count, right_count   = [0,0,0]
+            total_valid, left_valid, right_valid   = [0,0,0]
+            total_low, left_low, right_low = [0,0,0]
             reads             = []
+            left_jun_reads    = []
+            right_jun_reads = []
             #if two or more TSD at this loci, some might be caused by sequencing error, we add the count
             #and use high frequent one to get te orientation and family
             #if only one TSD found, we acturally use only this one
@@ -178,17 +182,44 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
                 total_count += teInsertions[event][start][foundTSD]['count']
                 left_count  += teInsertions[event][start][foundTSD]['left']
                 right_count += teInsertions[event][start][foundTSD]['right']
+                #total_low   += teInsertions[event][start][foundTSD]['count_low']
+                #left_low    += teInsertions[event][start][foundTSD]['left_low']
+                #right_low   += teInsertions[event][start][foundTSD]['right_low']
                 TE_orient_foward  += teInsertions[event][start][foundTSD]['+']
                 TE_orient_reverse += teInsertions[event][start][foundTSD]['-']
                 tsd_count[foundTSD] = teInsertions[event][start][foundTSD]['count']
                 reads.extend(teInsertions_reads[event][start][foundTSD]['read'])
+                left_jun_reads.extend(teInsertions_reads[event][start][foundTSD]['left_read'])
+                right_jun_reads.extend(teInsertions_reads[event][start][foundTSD]['right_read'])
+
             tsd_top = OrderedDict(sorted(tsd_count.items(), key=lambda x: x[1])).keys()[-1] 
             TE_orient         = '+' if int(TE_orient_foward) > int(TE_orient_reverse) else '-'
             repeat_junction   = insertion_family(','.join(reads), read_repeat)
 
-            #####information on each start position
-            start_both_junction = start_both_junction + 1 if (int(left_count) > 0 and int(right_count) > 0) else start_both_junction
-            start_collection.append([start, foundTSD, total_count, left_count, right_count, repeat_junction, ','.join(reads), total_supporting, left_supporting, right_supporting, left_reads, right_reads, repeat_supporting, TE_orient])
+            print 'reads: %s' %(','.join(reads))
+            print 'left: %s' %(','.join(left_jun_reads))
+            print 'right: %s' %(','.join(right_jun_reads))
+            #filter out these start with junctions only suported by low quality reads
+            #real number of high quality reads from sub_cluster not whole cluster
+            total_real, total_valid, left_valid, right_valid = lowquality_reads(left_jun_reads, right_jun_reads, teLowQualityReads)
+            print '%s\t%s\t%s\t%s' %(total_real, total_valid, left_valid, right_valid)
+            #total_valid = total_count - total_low
+            #left_valid  = left_count  - left_low
+            #right_valid = right_count - right_low
+            if total_real == 1 and total_valid == 0:
+                ##singleton junction and read is low quality, remove
+                del teInsertions[event][start]
+            elif left_valid == 0 and right_valid == 0:
+                ##junction only supported by low quality read, remove
+                del teInsertions[event][start]
+            else:
+                #####information on each start position
+                start_both_junction = start_both_junction + 1 if (int(left_count) > 0 and int(right_count) > 0) else start_both_junction
+                start_collection.append([start, foundTSD, total_count, left_count, right_count, repeat_junction, ','.join(reads), total_supporting, left_supporting, right_supporting, left_reads, right_reads, repeat_supporting, TE_orient])
+
+        if not len(start_collection) > 0:
+            #skip this event if there is no valid junctions
+            continue
 
         if len(teInsertions[event].keys()) > 1:
             #two or more start found in one read cluster
@@ -380,6 +411,24 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
     #if os.path.isfile(nonsup_gff) and os.path.getsize(nonsup_gff) > 0:
     #    os.system('%s intersect -v -a %s -b %s >> %s' %(bedtools, nonsup_gff, existingTE_bed, nonref_gff))
 
+def lowquality_reads(left_jun_reads, right_jun_reads, teLowQualityReads):
+    real_c, real_t, real_left_t, real_right_t = [0,0,0,0]
+    for rd1 in left_jun_reads:
+        print 'left reads: %s' %(rd1)
+        real_c += 1
+        if not teLowQualityReads.has_key(rd1):
+            real_left_t   += 1
+            real_t        += 1
+            print 'left: %s\t%s\t%s' %(real_c, real_left_t, real_t)
+    for rd2 in right_jun_reads:
+        print 'right reads: %s' %(rd2)
+        real_c += 1
+        if not teLowQualityReads.has_key(rd2):
+            real_right_t  += 1
+            real_t        += 1
+            print 'right: %s\t%s\t%s' %(real_c, real_right_t, real_t)
+    return [real_c, real_t, real_left_t, real_right_t]
+
 def read_direction(strands):
     plus  = 0
     minus = 0
@@ -425,7 +474,7 @@ def read_to_repeat(read_name, read_repeat):
         repeat_family = read_repeat[read_name4]
     return repeat_family
 
-def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
+def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teLowQualityReads):
     #determine TSD from read depth at insertions site
     #count depth to find TSD in
     #if there are 5 reads (2 right, 3 left) they
@@ -633,7 +682,7 @@ def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, te
                     seq    = teReadClusters_sub[sub_cluster]['read_inf'][name]['seq']
                     start  = teReadClusters_sub[sub_cluster]['read_inf'][name]['start']
                     strand = teReadClusters_sub[sub_cluster]['read_inf'][name]['strand']
-                    TSD_check_single(cluster, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
+                    TSD_check_single(cluster, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teLowQualityReads)
             else:
                 #estimate TSD_len using read depth
                 TSD_len = 0
@@ -663,7 +712,7 @@ def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, te
                         start  = teReadClusters_sub[sub_cluster]['read_inf'][name1]['start']
                         strand = teReadClusters_sub[sub_cluster]['read_inf'][name1]['strand']
                         #print name1, seq, start, strand, chro
-                        TSD_check(cluster, seq, chro, start, real_name, read_repeat, name1, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
+                        TSD_check_cluster(cluster, seq, chro, start, real_name, read_repeat, name1, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teLowQualityReads)
                         #print 'after tsd_check'
                 else:          
                     #what if we can not find TSD? still could be insertions
@@ -674,7 +723,7 @@ def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, te
                         seq    = teReadClusters_sub[sub_cluster]['read_inf'][name]['seq']
                         start  = teReadClusters_sub[sub_cluster]['read_inf'][name]['start']
                         strand = teReadClusters_sub[sub_cluster]['read_inf'][name]['strand']
-                        TSD_check(cluster, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)
+                        TSD_check_cluster(cluster, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teLowQualityReads)
             #print 'End of cycle'
 
 def tsd_finder(sub_cluster, tsd_depth, teReadClusters_sub_count, teReadClusters_sub_depth):
@@ -761,6 +810,9 @@ def align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, star
             #reads are mates of reads matched to middle of repeat
             #supporting reads
             teSupportingReads[count].append([name, seq, start, strand])
+        #elif not r.search(name) and record.is_paired:
+            #reads not matched to repeat but mates of junctions
+        #    teSupportingReads[count].append([name, seq, start, strand])
     else:
         #if start and end do not fall within last start and end
         #we now have a different insertion event
@@ -776,6 +828,9 @@ def align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, star
             #reads are mates of reads matched to middle of repeat
             #supporting reads
             teSupportingReads[count].append([name, seq, start, strand])
+        #elif not r.search(name) and record.is_paired:
+            #reads not matched to repeat but mates of junctions
+        #    teSupportingReads[count].append([name, seq, start, strand])
         #initial insertion site boundary
         bin_ins = [int(start), int(end)]
         #print '%s\t%s' %(count, bin_ins)
@@ -899,7 +954,7 @@ def calculate_cluster_depth(event, seq, start, name, strand, teReadClusters, teR
     for i in range(int(start), int(start)+len(seq)):
         teReadClusters_depth[event]['read_inf']['depth'][i] += 1
 
-def TSD_check_single(event, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
+def TSD_check_single(event, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teLowQualityReads):
     ##TSD already specified by usr, set tsd for single end of junction. actural the end of read if read on left of junction or start if read on right.
     ##seq is entire trimmd read, not just the TSD portion of the read
     ##start is the first postition of the entire read match to ref
@@ -966,10 +1021,20 @@ def TSD_check_single(event, seq, chro, start, real_name, read_repeat, name, TSD,
         else:
             print 'not match'
             ##non reference insertions
+            if teLowQualityReads.has_key(name):
+                teInsertions[event][TSD_start][TSD_seq]['count_low']     += 1
+                teInsertions[event][TSD_start][TSD_seq]['%s_low' %(pos)] += 1            
+
             teInsertions[event][TSD_start][TSD_seq]['count']   += 1   ## total junction reads
             teInsertions[event][TSD_start][TSD_seq][pos]       += 1   ## right/left junction reads
             teInsertions[event][TSD_start][TSD_seq][TE_orient] += 1   ## plus/reverse insertions
             #read_name = re.sub(r':start|:end', '', name)
+     
+            if pos == 'left':
+                teInsertions_reads[event][TSD_start][TSD_seq]['left_read'].append(name)
+            elif pos == 'right':
+                teInsertions_reads[event][TSD_start][TSD_seq]['right_read'].append(name)
+
             teInsertions_reads[event][TSD_start][TSD_seq]['read'].append(name)
             #print '1: %s\t 2: %s' %(read_name, teInsertions_reads[event][TSD_seq][TSD_start]['read'])
             print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
@@ -1055,7 +1120,91 @@ def convert_tag(tag):
         tags[t[0]] = t[1]
     return tags
 
-def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads):
+def TSD_check_cluster(event, seq, chro, start, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teLowQualityReads):
+    ##TSD already specified by usr, not unknown
+    ##seq is entire trimmd read, not just the TSD portion of the read
+    ##start is the first postition of the entire read match to ref
+    repeat = read_repeat[real_name] # need to deal with any te, get infor from name of reads
+    rev_com = reverse_complement(seq)
+    result    = 0
+    pos       = ''
+    TE_orient = 0
+    TSD_start = 0
+    TSD_seq   = ''
+    r5 = re.compile(r'start:[53]$')
+    r3 = re.compile(r'end:[53]$')
+    r5_tsd = re.compile(r'^(%s)' %(TSD))
+    r3_tsd = re.compile(r'(%s)$' %(TSD))
+    print 'TSD_check\t%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    ##start means that the TE was removed from the start of the read
+    ##5 means the trimmed end mapps to the 5prime end of the TE
+    ##3 means the trimmed end mapps to the 3prime end of the TE
+    if strand == '+':
+        if r5.search(name) and (r5_tsd.search(seq) or r3_tsd.search(rev_com)):
+            result    = 1
+            TSD_seq   = r5_tsd.search(seq).groups(0)[0] if r5_tsd.search(seq) else 'UNK'
+            pos       = 'right'
+            TE_orient = '-' if name[-1] == '5' else '+'
+            TSD_start = int(start)
+        elif r3.search(name) and (r5_tsd.search(rev_com) or r3_tsd.search(seq)):
+            result    = 1
+            TSD_seq   = r3_tsd.search(seq).groups(0)[0] if r3_tsd.search(seq) else 'UNK'
+            pos       = 'left'
+            TE_orient = '+' if name[-1] == '5' else '-'
+            TSD_start = int(start) + (len(seq)-len(TSD))
+    elif strand == '-':
+        if r5.search(name) and (r5_tsd.search(rev_com) or r3_tsd.search(seq)):
+            result    = 1
+            TSD_seq   = r3_tsd.search(seq).groups(0)[0] if r3_tsd.search(seq) else 'UNK'
+            pos       = 'left'
+            TE_orient = '+' if name[-1] == '5' else '-'
+            TSD_start = int(start) + (len(seq)-len(TSD))
+        elif r3.search(name) and (r5_tsd.search(seq) or r3_tsd.search(rev_com)):
+            result    = 1
+            TSD_seq   = r5_tsd.search(seq).groups(0)[0] if r5_tsd.search(seq) else 'UNK'
+            pos       = 'right'
+            TE_orient = '-' if name[-1] == '5' else '+'
+            TSD_start = int(start)
+    print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    if result and TE_orient:
+        tir1_end, tir2_end = [0, 0]
+        if 0:
+            continue
+        if pos == 'left':
+            tir1_end = int(start) + len(seq)
+            print 'tir1: %s' %(tir1_end)
+        elif pos == 'right':
+            tir2_end = int(start) - 1
+            print 'tir2: %s' %(tir2_end)
+        if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
+            te_id = existingTE_inf[chro]['start'][tir1_end]
+        #    #existingTE_found[te_id]['start'] += 1
+            print 'tir1'
+        elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
+            te_id = existingTE_inf[chro]['end'][tir2_end]
+        #    #existingTE_found[te_id]['end'] += 1
+            print 'tir2'
+        else:
+            #print 'not match'
+            ##non reference insertions
+            if teLowQualityReads.has_key(name):
+                teInsertions[event][TSD_start][TSD_seq]['count_low']     += 1
+                teInsertions[event][TSD_start][TSD_seq]['%s_low' %(pos)] += 1            
+                
+            teInsertions[event][TSD_start][TSD_seq]['count']   += 1   ## total junction reads
+            teInsertions[event][TSD_start][TSD_seq][pos]       += 1   ## right/left junction reads
+            teInsertions[event][TSD_start][TSD_seq][TE_orient] += 1   ## plus/reverse insertions
+            #read_name = re.sub(r':start|:end', '', name)
+            if pos == 'left':
+                teInsertions_reads[event][TSD_start][TSD_seq]['left_read'].append(name)
+            elif pos == 'right':
+                teInsertions_reads[event][TSD_start][TSD_seq]['right_read'].append(name)
+            teInsertions_reads[event][TSD_start][TSD_seq]['read'].append(name)
+            #print '1: %s\t 2: %s' %(read_name, teInsertions_reads[event][TSD_seq][TSD_start]['read'])
+            print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
+
+
+def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads):
     r = re.compile(r'(.*):(start|end):(5|3)')
     r_tsd = re.compile(r'UNK|UKN|unknown', re.IGNORECASE)
     r_cg  = re.compile(r'[SID]')
@@ -1087,15 +1236,24 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             if r_cg.search(cigar):
                 continue
             tags = convert_tag(tag)
-            #print '%s\t%s\t%s' %(name, start, length)
+            print '%s\t%s\t%s\t%s' %(name, start, MAPQ, tag)
             # filter low quality mapping reads: 
             # 1. paired-end reads at least have one reads unique mapped (MAPQ set to 0 for both reads if both are repeat, else should be > 0 at least one unique mapped)
             # 2. unpaired reads should unique mapped, no gap, mismatch <= 3 and no suboptimal alignment
             #print 'before: %s\t%s\t%s' %(name, count, bin_ins)
             #if record.is_proper_pair and (int(MAPQ) >= 29 or tags['XT'] == 'U'):
-            if record.is_proper_pair and int(MAPQ) > 0:
+            #if record.is_proper_pair and int(MAPQ) > 0:
+            if record.is_proper_pair:
+                print 'is proper paired'
+                #store low quality read in dict
+                if int(MAPQ) < 29:
+                    x1 = int(tags['X1']) if tags.has_key('X1') else 0
+                    xm = int(tags['XM']) if tags.has_key('XM') else 0
+                    xo = int(tags['XO']) if tags.has_key('XO') else 0
+                    teLowQualityReads[name] = [int(MAPQ), xm, x1, xo]
                 bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             elif not record.is_paired:
+                print 'is not paired'
                 #if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['XM']) <= 3 and int(tags['X1']) == 0:
                 #if tags['XT'] == 'U' and int(tags['XO']) == 0 and (int(tags['XM']) <= 3 or int(tags['X1']) == 0):
                 if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['X1']) <= 3:
@@ -1106,7 +1264,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
 
     ###TSD not given we infer from read depth
     if r_tsd.search(TSD):
-        TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found)        
+        TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, teReadClusters_depth, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teLowQualityReads)        
         
 def find_insertion_cluster_sam(sorted_align, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found):
     align_seg = pysam.AlignedSegment()
@@ -1232,6 +1390,7 @@ def main():
     teReadClusters_count = defaultdict(lambda : defaultdict(lambda : int()))
     teReadClusters_depth = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : int()))))
     teSupportingReads    = defaultdict(lambda : list())
+    teLowQualityReads    = defaultdict(lambda : list())
 
     top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
     #read existing TE from file
@@ -1281,7 +1440,7 @@ def main():
 
     ##cluster reads around insertions
     #find_insertion_cluster_sam(sorted_align, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found)
-    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads)
+    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads)
 
 
     ##output insertions
@@ -1289,7 +1448,7 @@ def main():
     #result  = '%s/results' %('/'.join(top_dir))
     #read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
     #read_repeat = read_repeat_name(read_repeat_files)
-    write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size)
+    write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size, teLowQualityReads)
 
  
 if __name__ == '__main__':
