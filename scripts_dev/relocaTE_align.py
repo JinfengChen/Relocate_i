@@ -158,7 +158,7 @@ def map_reads_bwa(scripts, flanking_fq, path, genome_file, fastq_dir, target, bw
     ##merge all bwa results into one file
     merged_bwa = '%s/bwa_aln/%s.repeat.bwa.bam' %(path, target)
     if len(bam2merge) > 0:
-        cmd1  = '%s merge %s %s' %(samtools, merged_bwa, ' '.join(bam2merge))
+        cmd1  = '%s merge -f %s %s' %(samtools, merged_bwa, ' '.join(bam2merge))
         cmd2  = '%s sort %s %s.sorted' %(samtools, merged_bwa, os.path.splitext(merged_bwa)[0])
         cmd3  = '%s index %s.sorted.bam' %(samtools, os.path.splitext(merged_bwa)[0])
         os.system(cmd1)
