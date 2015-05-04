@@ -96,7 +96,7 @@ def parse_align_blat(infile, tandem):
  
 
 def main():
-    if not len(sys.argv) == 5:
+    if not len(sys.argv) == 6:
         usage()
         sys.exit(2)
 
