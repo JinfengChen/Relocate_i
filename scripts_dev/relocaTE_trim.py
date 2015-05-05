@@ -252,7 +252,9 @@ def main():
                     #query read overlaps internal of database TE, no need to trim. These reads pairs will be used as supporting reads
                     #in relocate_align, we get the reads in trimmed files and their pairs.
                     #elif start == 0 and end + 1 == length and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
-                    elif start == 0 and end + 1 == length and int(mismatch) <= int(mismatch_allowance):
+                    #elif start == 0 and end + 1 == length and int(mismatch) <= int(mismatch_allowance):
+                    #for internal match we allowed more mismatch and deletions as the repeat are tend to have mutations among strains
+                    elif start == 0 and end + 1 == length:
                         trimmed_seq = seq
                         trimmed_qual= qual
                         seq_id   = header
