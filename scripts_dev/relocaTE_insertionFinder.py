@@ -1169,22 +1169,22 @@ def TSD_check_cluster(event, seq, chro, start, real_name, read_repeat, name, TSD
     print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
-        if 0:
+        if 0: # do not filter exiting TE when insertion have both junction support
             continue
-        if pos == 'left':
-            tir1_end = int(start) + len(seq)
-            print 'tir1: %s' %(tir1_end)
-        elif pos == 'right':
-            tir2_end = int(start) - 1
-            print 'tir2: %s' %(tir2_end)
-        if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
-            te_id = existingTE_inf[chro]['start'][tir1_end]
+        #if pos == 'left':
+        #    tir1_end = int(start) + len(seq)
+        #    print 'tir1: %s' %(tir1_end)
+        #elif pos == 'right':
+        #    tir2_end = int(start) - 1
+        #    print 'tir2: %s' %(tir2_end)
+        #if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
+        #    te_id = existingTE_inf[chro]['start'][tir1_end]
         #    #existingTE_found[te_id]['start'] += 1
-            print 'tir1'
-        elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
-            te_id = existingTE_inf[chro]['end'][tir2_end]
+        #    print 'tir1'
+        #elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
+        #    te_id = existingTE_inf[chro]['end'][tir2_end]
         #    #existingTE_found[te_id]['end'] += 1
-            print 'tir2'
+        #    print 'tir2'
         else:
             #print 'not match'
             ##non reference insertions
@@ -1364,6 +1364,9 @@ def parse_regex(infile):
 
 
 def main():
+    if not len(sys.argv) == 12:
+        usage()
+        exit(2)
 
     required_reads       = 1           ## rightReads + leftReads needs to be > to this value
     required_left_reads  = 1           ## needs to be >= to this value
