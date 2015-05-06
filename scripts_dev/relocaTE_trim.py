@@ -189,12 +189,12 @@ def main():
                     #want to cut and keep anything not matching to database TE
                     trimmed_seq  = ''
                     trimmed_qual = ''
-                    #print header, tName, tStart, tEnd
+                    print >> sys.stderr, header, tName, tStart, tEnd
                     #print 'check2: %s\t%s\t%s'  %(str(tStart), str((length - (match + mismatch))), str((mismatch/(match + mismatch))))
                     ##query read overlaps 5' end of database TE & trimmed seq > cutoff
                     #int(start) <= 2 or int(end) >= int(length) - 3, we need the reads mapped boundary to align with te
                     #if tStart == 0 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
-                    if tStart == 0 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) >= len_cutoff_m and int(mismatch)  <= int(mismatch_allowance):
+                    if tStart <= 2 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) >= len_cutoff_m and int(mismatch)  <= int(mismatch_allowance):
                         tS = int(tStart) + 1
                         tE = int(tEnd) + 1
                         qS = int(start) + 1
@@ -218,13 +218,13 @@ def main():
                             seq_desc = ''
                             seq_id   = '%s:end:5' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
-                        #print '1: trimmed: %s %s' %(trimmed_seq, str(end))
+                        print >> sys.stderr, '1: trimmed: %s %s' %(trimmed_seq, str(end))
                         if len(trimmed_seq) >= len_cutoff_l:
                             print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand)
                             print >> ofile_te5, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
                     #query read overlaps 3' end of database TE & trimmed seq > cutoff
                     #elif tEnd == tLen - 1 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
-                    elif tEnd == tLen - 1 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff_m and int(mismatch) <= int(mismatch_allowance):
+                    elif tEnd >= (tLen - 3) and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff_m and int(mismatch) <= int(mismatch_allowance):
                         tS = int(tStart) + 1
                         tE = int(tEnd) + 1
                         qS = int(start) + 1
@@ -245,7 +245,7 @@ def main():
                             seq_desc = ''
                             seq_id   = '%s:start:3' %(seq_id)
                             header = '%s%s' %(seq_id, seq_desc)
-                        #print '2: trimmed: %s %s' %(trimmed_seq, str(end))
+                        print >> sys.stderr, '2: trimmed: %s %s' %(trimmed_seq, str(end))
                         if len(trimmed_seq) >= len_cutoff_l:
                             print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand)
                             print >> ofile_te3, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
@@ -254,7 +254,7 @@ def main():
                     #elif start == 0 and end + 1 == length and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
                     #elif start == 0 and end + 1 == length and int(mismatch) <= int(mismatch_allowance):
                     #for internal match we allowed more mismatch and deletions as the repeat are tend to have mutations among strains
-                    elif start == 0 and end + 1 == length:
+                    elif start <= 2 and end + 1 >= length - 3:
                         trimmed_seq = seq
                         trimmed_qual= qual
                         seq_id   = header
@@ -262,7 +262,7 @@ def main():
                         seq_id   = '%s:middle' %(seq_id)
                         header = '%s%s' %(seq_id, seq_desc)
                         print >> ofile_rr, '%s\t%s\t%s' %(rl_name, tName, strand) 
-                        #print '3: trimmed: %s %s' %(trimmed_seq, str(end))
+                        print >> sys.stderr, '3: trimmed: %s %s' %(trimmed_seq, str(end))
                     ##trimmed reads
                     if len(trimmed_seq) >= len_cutoff_l:
                         print '@%s\n%s\n%s\n%s' %(header, trimmed_seq, qualh, trimmed_qual)
