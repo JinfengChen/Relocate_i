@@ -93,7 +93,79 @@ def parse_align_blat(infile, tandem):
                 #print qName, qStart, qEnd
     ofile.close()
     return coord
- 
+
+def convert_tag(tag):
+    tags = {}
+    for t in tag:
+        tags[t[0]] = t[1]
+    return tags
+
+def parse_align_bwa(infile, tandem):
+    coord = defaultdict(lambda : defaultdict(lambda : str))
+    ##align_file
+    ofile = open(tandem, 'w')
+    fsam = pysam.AlignmentFile(infile, 'rb')
+    rnames = fsam.references
+    rlens  = fsam.lengths
+    for record in fsam.fetch(reference=None, until_eof = True):
+        if not record.is_unmapped:
+            #query inf
+            qName    = query_name
+            qLen     = int(record.query_length)
+            qStart   = int(record.query_alignment_start) + 1
+            qEnd     = int(record.query_alignment_end) + 1
+            #target inf
+            tName    = rnames[record.reference_id]
+            tLen     = int(rlens[record.reference_id])
+            tStart   = int(record.reference_start) + 1
+            tEnd     = int(record.reference_end) + 1
+            #match and mismatch
+            tag      = record.tags if record.tags else []
+            tags     = convert_tag(tag)
+            mismatch = int(tags['XM'])
+            match    = int(record.query_alignment_length) - mismatch
+            #strand, flag is 0 is read if read is unpaired and mapped to plus strand
+            strand   = ''
+            if int(flag) == 0:
+                strand = '+'
+            else:
+                strand = '-' if record.is_reverse else '+'
+            #update data
+            boundary = 1 if int(qStart) == 0 or int(qEnd) + 1 == int(qLen) else 0 
+            addRecord = 0
+            #print qName, qStart, qEnd, match, boundary
+            if coord.has_key(qName):
+                ##keep the best match to TE
+                if int(boundary) > int(coord[qName]['boundary']):
+                        addRecord = 1
+                elif int(boundary) == int(coord[qName]['boundary']):
+                    if int(match) > int(coord[qName]['match']):
+                        addRecord = 1
+                    else:
+                        addRecord = 0
+                else:
+                    addRecord = 0
+            else:
+                addRecord = 1
+             
+            #final data
+            #print qName, qStart, qEnd, match, addRecord
+            if addRecord == 1:
+                coord[qName]['match']    = match
+                coord[qName]['len']      = qLen
+                coord[qName]['start']    = qStart
+                coord[qName]['end']      = qEnd
+                coord[qName]['tLen']     = tLen
+                coord[qName]['mismatch'] = mismatch
+                coord[qName]['strand']   = strand
+                coord[qName]['tName']    = tName
+                coord[qName]['tStart']   = tStart
+                coord[qName]['tEnd']     = tEnd
+                coord[qName]['boundary'] = boundary
+                #print qName, qStart, qEnd
+    ofile.close()
+    return coord
+
 
 def main():
     if not len(sys.argv) == 6:
@@ -117,18 +189,32 @@ def main():
     tandem_file= '%s/%s.potential_tandemInserts_containing_reads.list.txt' %(out_fq_path, file_name)
     read_repeat_file = '%s/%s.read_repeat_name.txt' %(out_fq_path, file_name) 
     #parse align
+    TE = 'unspecified'
+    FA = 'unspecified'
     coord = defaultdict(lambda : defaultdict(lambda : str))
     if align_type == 'blat':
         coord = parse_align_blat(align_file, tandem_file)
-    
+        s = re.compile(r'(\S+)\.te_(\S+)\.blatout')
+        m = s.search(file_name)
+        if m:
+            FA = m.groups(0)[0]
+            TE = m.groups(0)[1]
+    elif align_type == 'bam':
+        coord = parse_align_bwa(align_file, tandem_file)   
+        s = re.compile(r'(\S+)\.te_(\S+)\.bam')
+        m = s.search(file_name)
+        if m:
+            FA = m.groups(0)[0]
+            TE = m.groups(0)[1] 
+
     #outfiles
-    TE = 'unspecified'
-    FA = 'unspecified' 
-    s = re.compile(r'(\S+)\.te_(\S+)\.blatout')
-    m = s.search(file_name)
-    if m:
-        FA = m.groups(0)[0]
-        TE = m.groups(0)[1]
+    #TE = 'unspecified'
+    #FA = 'unspecified' 
+    #s = re.compile(r'(\S+)\.te_(\S+)\.blatout')
+    #m = s.search(file_name)
+    #if m:
+    #    FA = m.groups(0)[0]
+    #    TE = m.groups(0)[1]
     outfq  = 0
     outte5 = 0
     outte3 = 0
@@ -194,7 +280,8 @@ def main():
                     ##query read overlaps 5' end of database TE & trimmed seq > cutoff
                     #int(start) <= 2 or int(end) >= int(length) - 3, we need the reads mapped boundary to align with te
                     #if tStart == 0 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
-                    if tStart <= 2 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) >= len_cutoff_m and int(mismatch)  <= int(mismatch_allowance):
+                    #if tStart <= 2 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) >= len_cutoff_m and int(mismatch)  <= int(mismatch_allowance):
+                    if tStart <= 2 and (int(start) <= 2 or int(end) >= int(length) - 3) and (match + mismatch) >= len_cutoff_m and (length - (match + mismatch)) >= len_cutoff_l and int(mismatch)  <= int(mismatch_allowance):
                         tS = int(tStart) + 1
                         tE = int(tEnd) + 1
                         qS = int(start) + 1
@@ -224,7 +311,8 @@ def main():
                             print >> ofile_te5, '>%s %s..%s matches %s:%s..%s mismatches:%s\n%s' %(header, qS, qE, TE, tS, tE, mismatch, te_subseq)
                     #query read overlaps 3' end of database TE & trimmed seq > cutoff
                     #elif tEnd == tLen - 1 and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff and (float(mismatch)/(float(match) + float(mismatch))) <= mismatch_allowance:
-                    elif tEnd >= (tLen - 3) and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff_m and int(mismatch) <= int(mismatch_allowance):
+                    #elif tEnd >= (tLen - 3) and (int(start) <= 2 or int(end) >= int(length) - 3) and (length - (match + mismatch)) > len_cutoff_m and int(mismatch) <= int(mismatch_allowance):
+                    elif tEnd >= (tLen - 3) and (int(start) <= 2 or int(end) >= int(length) - 3) and (match + mismatch) >= len_cutoff_m and (length - (match + mismatch)) >= len_cutoff_l and int (mismatch) <= int(mismatch_allowance):
                         tS = int(tStart) + 1
                         tE = int(tEnd) + 1
                         qS = int(start) + 1

@@ -60,7 +60,7 @@ def Overlap_TE_boundary(prefix, refte):
     clean_gff   = '%s.clean.gff' %(prefix)
     infile = '%s.overlap' %(prefix)
     outfile= '%s.remove.gff' %(prefix)
-    os.system('/opt/bedtools/2.17.0-25-g7b42b3b/bin/bedtools window -w 10 -a %s -b %s > %s' %(final_gff, refte, infile))
+    os.system('/opt/bedtools/2.17.0-25-g7b42b3b/bin/bedtools window -w 20 -a %s -b %s > %s' %(final_gff, refte, infile))
     if not os.path.isfile(infile) or not os.path.getsize(infile) > 0:
         return 1 
     ofile  = open(outfile, 'w') 
