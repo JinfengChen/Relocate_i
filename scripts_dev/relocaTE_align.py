@@ -205,7 +205,7 @@ def map_reads_bwa(scripts, flanking_fq, path, genome_file, fastq_dir, target, bw
                 #%(scripts, fastq1, fastq2, path, fq_name, path, target)
                 cmd = '%s/clean_pairs_memory.py --fq1 %s --fq2 %s --repeat %s/te_containing_fq --fq_dir %s --seqtk %s' %(scripts, fastq1, fastq2, path, fastq_dir, seqtk)
                 print cmd
-                #os.system(cmd)
+                os.system(cmd)
             match1 = '%s.matched' %(fastq1)
             match2 = '%s.matched' %(fastq2)
             unpaired = '%s/flanking_seq/%s.unPaired.fq' %(path, fq_name)

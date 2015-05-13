@@ -1227,7 +1227,7 @@ def TSD_check_cluster(event, seq, chro, start, real_name, read_repeat, name, TSD
             print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
 
 
-def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads):
+def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads):
     r = re.compile(r'(.*):(start|end):(5|3)')
     r_tsd = re.compile(r'UNK|UKN|unknown', re.IGNORECASE)
     r_cg1 = re.compile(r'[S]')
@@ -1251,6 +1251,25 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             length = len(seq)
             chro   = rnames[record.reference_id]
             end    = int(start) + int(length) - 1 #should not allowed for indel or softclip
+
+            #filter false junctions
+            if r.search(name):
+                read_order = 0
+                if record.is_read1:
+                    read_order = 1
+                elif record.is_read2:
+                    read_order = 2
+                jun_read_name = r.search(name).groups(0)[0]
+                if jun_read_name[-2:] == '/1':
+                    if teJunctionReads[jun_read_name[:-2]][1] == 1:
+                        continue
+                elif jun_read_name[-2:] == '/2':
+                    if teJunctionReads[jun_read_name[:-2]][2] == 1:
+                        continue
+                else:
+                    if teJunctionReads[jun_read_name][read_order] == 1:
+                        continue
+
             strand = ''
             cg_flag= 0
             # flag is 0 is read if read is unpaired and mapped to plus strand
@@ -1385,6 +1404,36 @@ def createdir(dirname):
     if not os.path.exists(dirname):
         os.mkdir(dirname)
 
+def read_junction_reads_align(align_file_f, teJunctionReads):
+    target = 'ALL'
+    ref  = None if target == 'ALL' else target
+    fsam = pysam.AlignmentFile(align_file_f, 'rb')
+    rnames = fsam.references
+    for record in fsam.fetch(reference=ref, until_eof = True):
+        read_order = 0
+        if record.is_read1:
+            read_order = 1
+        elif record.is_read2:
+            read_order = 2 
+        if not record.is_unmapped:
+            name   = record.query_name
+            flag   = record.flag
+            MAPQ   = record.mapping_quality
+            cigar  = record.cigarstring
+            seq    = record.query_sequence
+            tag    = record.tags if record.tags else []
+            chro   = rnames[record.reference_id]
+            match  = 0
+            for (key, length) in record.cigartuples:
+                #print key, length
+                if int(key) == 0:
+                    match += length
+            if int(MAPQ) >= 29 and match >= len(seq) - 3:
+                teJunctionReads[name][read_order] = 1
+        else:
+            name   = record.query_name
+            teJunctionReads[name][read_order] = 0
+
 def parse_regex(infile):
     data = []
     with open (infile, 'r') as filehd:
@@ -1431,6 +1480,7 @@ def main():
     teReadClusters_depth = defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : defaultdict(lambda : int()))))
     teSupportingReads    = defaultdict(lambda : list())
     teLowQualityReads    = defaultdict(lambda : list())
+    teJunctionReads      = defaultdict(lambda : defaultdict(lambda : int()))
 
     top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
     #read existing TE from file
@@ -1478,9 +1528,15 @@ def main():
     read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
     read_repeat = read_repeat_name(read_repeat_files)
 
+    #read and store full length reads alignment on genome
+    #*.repeat.fullreads.bwa.sorted.bam
+    #*.repeat.bwa.sorted.bam
+    align_file_f = re.sub(r'.bwa.sorted.bam', r'.fullreads.bwa.sorted.bam', align_file)
+    read_junction_reads_align(align_file_f, teJunctionReads)
+
     ##cluster reads around insertions
     #find_insertion_cluster_sam(sorted_align, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found)
-    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads)
+    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads)
 
 
     ##output insertions
