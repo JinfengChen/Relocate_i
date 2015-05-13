@@ -77,6 +77,10 @@ def parse_align_blat(infile, tandem):
             else:
                 addRecord = 1
 
+            #filter bad alignment with two many or large gaps
+            if int(unit[4]) > 1 or int(unit[5]) > 3 or int(unit[6]) > 1 or int(unit[7]) > 3:
+                addRecord = 0
+
             #print qName, qStart, qEnd, match, addRecord
             if addRecord == 1:
                 coord[qName]['match']    = match
