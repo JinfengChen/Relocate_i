@@ -1227,7 +1227,7 @@ def TSD_check_cluster(event, seq, chro, start, real_name, read_repeat, name, TSD
             print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
 
 
-def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads):
+def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads, mm_allow):
     r = re.compile(r'(.*):(start|end):(5|3)')
     r_tsd = re.compile(r'UNK|UKN|unknown', re.IGNORECASE)
     r_cg1 = re.compile(r'[S]')
@@ -1297,23 +1297,30 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                     xm = int(tags['XM']) if tags.has_key('XM') else 0
                     xo = int(tags['XO']) if tags.has_key('XO') else 0
                     teLowQualityReads[name] = [int(MAPQ), xm, x1, xo]
-                if r.search(name): #junction reads, allowed only 1 mismatch and no indels
-                    if int(tags['XM']) <= 2 and cg_flag == 0:
+                    
+                if r.search(name): #junction reads, allowed 2 mismatch and 1 indels
+                    if int(tags['XM']) <= int(mm_allow) and int(tags['XO']) <= 1:
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
                 else:              #supporting reads, allowed upto 3 mismatch
-                    if int(tags['XM']) <= 3:
+                    if int(tags['XM']) <= int(mm_allow):
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             #elif not record.is_paired:
             else:
                 print 'is not paired or not proper paired'
+                #store low quality read in dict, not properly paired is low quality
+                if int(MAPQ) < 29 or record.is_paired:
+                    x1 = int(tags['X1']) if tags.has_key('X1') else 0
+                    xm = int(tags['XM']) if tags.has_key('XM') else 0
+                    xo = int(tags['XO']) if tags.has_key('XO') else 0
+                    teLowQualityReads[name] = [int(MAPQ), xm, x1, xo]
                 #if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['XM']) <= 3 and int(tags['X1']) == 0:
                 #if tags['XT'] == 'U' and int(tags['XO']) == 0 and (int(tags['XM']) <= 3 or int(tags['X1']) == 0):
                 #if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['X1']) <= 3:
                 if r.search(name): #junction reads, allowed only 1 mismatch
-                    if tags['XT'] == 'U' and cg_flag == 0 and int(tags['XM']) <= 2 and int(tags['X1']) <= 3:
+                    if tags['XT'] == 'U' and cg_flag == 0 and int(tags['XM']) <= int(mm_allow) and int(tags['X1']) <= 3:
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
                 else:
-                    if tags['XT'] == 'U' and int(tags['XM']) <= 3 and int(tags['X1']) <= 3:
+                    if tags['XT'] == 'U' and int(tags['XM']) <= int(mm_allow) and int(tags['X1']) <= 3:
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             teReadClusters[count]['read_inf']['seq']['chr'] = chro
             #print 'after: %s\t%s\t%s' %(name, count, bin_ins)
@@ -1536,7 +1543,7 @@ def main():
 
     ##cluster reads around insertions
     #find_insertion_cluster_sam(sorted_align, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found)
-    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads)
+    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads, mm_allow)
 
 
     ##output insertions

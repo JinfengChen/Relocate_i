@@ -23,6 +23,8 @@ python relocaTE.py --fq_dirMSU7.Chr4.ALL.rep1_reads_5X_100_500 --genome_fasta MS
 
 --cpu: cpu numbers to run multiprocess jobs, default=1
 --run: run all steps while excute this script or only generate scripts for all steps.
+--mismatch: allowed mismatches in blat alignment of reads to repeats. default=2, range from 1 to 3
+--mismatch_junction: allowed mismatches in bwa alignment of trimed reads to genome. default=2, range from 1 to 3
 
     '''
     print message
@@ -172,7 +174,8 @@ def main():
     parser.add_argument('-c', '--cpu', default='1', type=int)
     parser.add_argument('--len_cut_match', default='20', type=int)
     parser.add_argument('--len_cut_trim', default='20', type=int)
-    parser.add_argument('--mismatch', default='0', type=int)
+    parser.add_argument('--mismatch', default='2', type=int)
+    parser.add_argument('--mismatch_junction', default='2', type=int)
     parser.add_argument('--step', default='1234567', type=str)
     parser.add_argument('--run', dest='run', action='store_true')
     parser.add_argument('-v', dest='verbose', action='store_true')
@@ -451,7 +454,7 @@ def main():
     createdir('%s/shellscripts/step_5' %(args.outdir))
     step5_count = 0
     for chrs in ids:
-        step5_cmd = 'python %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s 0 0 %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.size)
+        step5_cmd = 'python %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s %s 0 %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.mismatch_junction, args.size)
         step5_file= '%s/shellscripts/step_5/%s.repeat.findSites.sh' %(args.outdir, step5_count)
         if '5' in list(args.step):
             shells.append('sh %s' %(step5_file))
