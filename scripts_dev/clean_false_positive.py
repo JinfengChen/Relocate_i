@@ -119,7 +119,7 @@ def main():
     
 
     #if not os.path.isfile(args.input) or not os.path.getsize(args.input) > 0:
-    txt2gff('%s.txt' %(os.path.splitext(args.input)[0]), args.input, 'non_reference')
+    #txt2gff('%s.txt' %(os.path.splitext(args.input)[0]), args.input, 'non_reference')
     #os.system('bedtools window -w 10 -a %s -b %s > %s.overlap' %(args.input, args.refte, os.path.splitext(args.input)[0]))
     Overlap_TE_boundary(os.path.splitext(args.input)[0], args.refte, args.distance)
     

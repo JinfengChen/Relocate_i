@@ -19,7 +19,7 @@ python CircosConf.py --input circos.config --output pipe.conf
 #Retro1  ACGTC   not.give        Chr4    14199..14203    -       T:7     R:4     L:3     ST:21   SR:9    SL:12
 def txt2gff(infile, outfile, ins_type):
     #print infile, outfile
-    ofile = open(outfile, 'a')
+    ofile = open(outfile, 'w')
     count = 0
     r_pos = re.compile(r'(\d+)\.\.(\d+)')
     with open (infile, 'r') as filehd:
@@ -431,8 +431,8 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
     READS.close()
     txt2gff(nonref, nonref_gff, 'Non-reference, not found in reference')
     txt2gff(nonsup, nonsup_gff, 'Non-reference, not found in reference')
-    #if os.path.isfile(nonsup_gff) and os.path.getsize(nonsup_gff) > 0:
-    #    os.system('%s intersect -v -a %s -b %s >> %s' %(bedtools, nonsup_gff, existingTE_bed, nonref_gff))
+    if os.path.isfile(nonsup_gff) and os.path.getsize(nonsup_gff) > 0:
+        os.system('%s intersect -v -a %s -b %s >> %s' %(bedtools, nonsup_gff, existingTE_bed, nonref_gff))
 
 def lowquality_reads(left_jun_reads, right_jun_reads, teLowQualityReads):
     real_c, real_t, real_left_t, real_right_t = [0,0,0,0]

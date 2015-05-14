@@ -93,7 +93,7 @@ def parse_align_blat(infile, tandem):
                 coord[qName]['tStart']   = tStart
                 coord[qName]['tEnd']     = tEnd
                 coord[qName]['boundary'] = boundary
-                print >> sys.stderr, qName, qLen, qStart, qEnd, tName, tLen, tStart, tEnd, match, mismatch, boundary
+                #print >> sys.stderr, qName, qLen, qStart, qEnd, tName, tLen, tStart, tEnd, match, mismatch, boundary
     ofile.close()
     return coord
 
@@ -197,7 +197,7 @@ def parse_align_bwa(infile, tandem):
                 coord[qName]['tStart']   = tStart
                 coord[qName]['tEnd']     = tEnd
                 coord[qName]['boundary'] = boundary
-                print >> sys.stderr, qName, qLen, qStart, qEnd, tName, tLen, tStart, tEnd, match, mismatch, boundary
+                #print >> sys.stderr, qName, qLen, qStart, qEnd, tName, tLen, tStart, tEnd, match, mismatch, boundary
     ofile.close()
     return coord
 
@@ -316,7 +316,7 @@ def main():
                     #want to cut and keep anything not matching to database TE
                     trimmed_seq  = ''
                     trimmed_qual = ''
-                    print >> sys.stderr, 'Check:', header, start, end, length, tName, tStart, tEnd, tLen, mismatch, match, strand
+                    #print >> sys.stderr, 'Check:', header, start, end, length, tName, tStart, tEnd, tLen, mismatch, match, strand
                     #print 'check2: %s\t%s\t%s'  %(str(tStart), str((length - (match + mismatch))), str((mismatch/(match + mismatch))))
                     ##query read overlaps 5' end of database TE & trimmed seq > cutoff
                     #int(start) <= 2 or int(end) >= int(length) - 3, we need the reads mapped boundary to align with te
