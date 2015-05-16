@@ -389,7 +389,7 @@ def main():
     
     samtools = ''
     bwa      = ''
-    seqtk    = ''    
+    seqtk    = ''
 
     try:
         subprocess.check_output('which samtools', shell=True)
@@ -404,7 +404,9 @@ def main():
         bwa = re.sub(r'\n', '', bwa)
     except:
         bwa = '/opt/tyler/bin/bwa'
-    
+   
+    #bwa = '/opt/bwa/0.7.9/bin/bwa'
+    bwa = '/opt/tyler/bin/bwa'
     
     try:
         subprocess.check_output('which seqtk', shell=True)

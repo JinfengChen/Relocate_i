@@ -172,8 +172,9 @@ def main():
     parser.add_argument('-o', '--outdir')
     parser.add_argument('-s', '--size', default='500', type=int)
     parser.add_argument('-c', '--cpu', default='1', type=int)
-    parser.add_argument('--len_cut_match', default='20', type=int)
-    parser.add_argument('--len_cut_trim', default='20', type=int)
+    parser.add_argument('--aligner', default='blat', type=str)
+    parser.add_argument('--len_cut_match', default='10', type=int)
+    parser.add_argument('--len_cut_trim', default='10', type=int)
     parser.add_argument('--mismatch', default='2', type=int)
     parser.add_argument('--mismatch_junction', default='2', type=int)
     parser.add_argument('--step', default='1234567', type=str)
@@ -234,7 +235,9 @@ def main():
     samtools = ''
     bedtools = ''
     bwa      = ''
-    
+    blat     = ''
+    seqtk    = ''    
+
     try:
         subprocess.check_output('which samtools', shell=True)
         samtools = subprocess.check_output('which samtools', shell=True)
@@ -254,8 +257,8 @@ def main():
         bwa = subprocess.check_output('which bwa', shell=True)
         bwa = re.sub(r'\n', '', bwa)
     except:
-        bwa = '/opt/tyler/bin/bwa'
- 
+        bwa = '/opt/bwa/0.7.9/bin/bwa'
+
     try:
         subprocess.check_output('which blat', shell=True)
         blat = subprocess.check_output('which blat', shell=True)
@@ -269,6 +272,13 @@ def main():
         seqtk = re.sub(r'\n', '', seqtk)
     except:
         seqtk = '/rhome/cjinfeng/software/tools/seqtk-master//seqtk'
+
+    #overwrite tools
+    blat = '/usr/local/bin/blat'
+    bwa = '/opt/bwa/0.7.9/bin/bwa'
+    bedtools = '/opt/bedtools/2.17.0-25-g7b42b3b/bin//bedtools'
+    samtools = '/opt/samtools-0.1.16/samtools'
+    seqtk = '/rhome/cjinfeng/software/tools/seqtk-master//seqtk'
 
     #MSU_r7.fa.bwt
     if not os.path.isfile('%s.bwt' %(reference)):
@@ -393,34 +403,59 @@ def main():
         fq      = fastas[fa]
         #fq      = '%s.fq' %(os.path.splitext(fa)[0]) if os.path.isfile('%s.fq' %(os.path.splitext(fa)[0])) else '%s.fastq' %(os.path.splitext(fa)[0])
         fa_prefix = os.path.split(os.path.splitext(fa)[0])[1]
-        blatout = '%s/repeat/blat_output/%s.te_repeat.blatout' %(args.outdir, fa_prefix)
-        blatstd = '%s/repeat/blat_output/blat.out' %(args.outdir)
-        blatcmd = '%s -minScore=10 -tileSize=7 %s %s %s 1>>%s 2>>%s' %(blat ,te_fasta, fa, blatout, blatstd, blatstd)
-        flank= '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fa_prefix)
-        trim = 'python %s/relocaTE_trim.py %s %s %s %s %s > %s' %(RelocaTE_bin, blatout, fq, args.len_cut_match, args.len_cut_trim, args.mismatch, flank)
-        step3_file = '%s/shellscripts/step_3/%s.te_repeat.blat.sh' %(args.outdir, step3_count)
-        if not os.path.isfile(blatout) or os.path.getsize(blatout) == 0:
-            if '3' in list(args.step):
-                shells.append('sh %s' %(step3_file))
-                shells_step3.append('sh %s' %(step3_file))
-                step3_cmds = '%s\n%s' %(blatcmd, trim)
-                writefile(step3_file, step3_cmds)
-                step3_count += 1
-        elif not os.path.isfile(flank) or os.path.getsize(flank) == 0:
-            if '3' in list(args.step):
-                shells.append('sh %s' %(step3_file))
-                shells_step3.append('sh %s' %(step3_file))
-                step3_cmds = '%s' %(trim)
-                writefile(step3_file, step3_cmds)
-                step3_count += 1
-       
+        if args.aligner == 'blat':
+            blatout = '%s/repeat/blat_output/%s.te_repeat.blatout' %(args.outdir, fa_prefix)
+            blatstd = '%s/repeat/blat_output/blat.out' %(args.outdir)
+            blatcmd = '%s -minScore=10 -tileSize=7 %s %s %s 1>>%s 2>>%s' %(blat ,te_fasta, fa, blatout, blatstd, blatstd)
+            flank   = '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fa_prefix)
+            trim    = 'python %s/relocaTE_trim.py %s %s %s %s %s > %s' %(RelocaTE_bin, blatout, fq, args.len_cut_match, args.len_cut_trim, args.mismatch, flank)
+            step3_file = '%s/shellscripts/step_3/%s.te_repeat.blat.sh' %(args.outdir, step3_count)
+            if not os.path.isfile(blatout) or os.path.getsize(blatout) == 0:
+                if '3' in list(args.step):
+                    shells.append('sh %s' %(step3_file))
+                    shells_step3.append('sh %s' %(step3_file))
+                    step3_cmds = '%s\n%s' %(blatcmd, trim)
+                    writefile(step3_file, step3_cmds)
+                    step3_count += 1
+            elif not os.path.isfile(flank) or os.path.getsize(flank) == 0:
+                if '3' in list(args.step):
+                    shells.append('sh %s' %(step3_file))
+                    shells_step3.append('sh %s' %(step3_file))
+                    step3_cmds = '%s' %(trim)
+                    writefile(step3_file, step3_cmds)
+                    step3_count += 1
+        elif args.aligner == 'bwa':
+            #/opt/bwa/0.7.9/bin/bwa mem -t 4 -k 15 -T 10 $genome $read1 | /usr/local/bin/samtools view -Shb -F 4 - > $prefix1.te_repeat.bam
+            bwaout  = '%s/repeat/blat_output/%s.te_repeat.bam' %(args.outdir, fa_prefix)
+            bwastd  = '%s/repeat/blat_output/bwa.out' %(args.outdir)
+            bwacmd  = '%s mem -t %s -k 15 -T 10 %s %s | %s view -Shb -F 4 - > %s 2> %s' %(bwa, args.cpu, te_fasta, fq, samtools, bwaout, bwastd)
+            flank   = '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fa_prefix)
+            trim    = 'python %s/relocaTE_trim.py %s %s %s %s %s > %s' %(RelocaTE_bin, bwaout, fq, args.len_cut_match, args.len_cut_trim, args.mismatch, flank)
+            step3_file = '%s/shellscripts/step_3/%s.te_repeat.bwa.sh' %(args.outdir, step3_count)
+            if not os.path.isfile(bwaout) or os.path.getsize(bwaout) == 0:
+                if '3' in list(args.step):
+                    shells.append('sh %s' %(step3_file))
+                    shells_step3.append('sh %s' %(step3_file))
+                    step3_cmds = '%s\n%s' %(bwacmd, trim)
+                    writefile(step3_file, step3_cmds)
+                    step3_count += 1
+            elif not os.path.isfile(flank) or os.path.getsize(flank) == 0:
+                if '3' in list(args.step):
+                    shells.append('sh %s' %(step3_file))
+                    shells_step3.append('sh %s' %(step3_file))
+                    step3_cmds = '%s' %(trim)
+                    writefile(step3_file, step3_cmds)
+                    step3_count += 1
+ 
     #run job in this script
     if args.run and len(shells_step3) > 0 and '3' in list(args.step):
-        if int(args.cpu) == 1:
+        if args.aligner == 'blat':
+            if int(args.cpu) == 1:
+                single_run(shells_step3)
+            else:
+                mp_pool(shells_step3, int(args.cpu)) 
+        elif args.aligner == 'bwa':
             single_run(shells_step3)
-        else:
-            mp_pool(shells_step3, int(args.cpu)) 
-
 
     #step4 align TE trimed reads to genome
     shells_step4 = []
