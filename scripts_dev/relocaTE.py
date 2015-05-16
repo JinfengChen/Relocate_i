@@ -44,6 +44,29 @@ def writefile(outfile, lines):
     print >> ofile, lines
     ofile.close()
 
+#split large fastq file into 1M reads chunks
+#convert to fa when fa_flag == 1
+#return dictory with fq->fa or fq->1 directionary
+def split_fq(fastq, outdir, fa_flag):
+    fastq_files = defaultdict(lambda : str())
+    seqtk = '/rhome/cjinfeng/software/tools/seqtk-master//seqtk'
+    fastq_split = 'perl /rhome/cjinfeng/software/bin/fastq_split.pl' 
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    os.system('%s -s 1000000 -o %s %s' %(fastq_split, outdir, fastq))
+    if int(fa_flag) == 1:
+        subfqs = glob.glob('%s/*.f*q' %(outdir))
+        for subfq in subfqs:
+            subfa = '%s.fa' %(os.path.splitext(subfq)[0])
+            fq2fa = '%s seq -A %s > %s' %(seqtk, subfq, subfa)
+            os.system(fq2fa)
+            fastq_files[subfq] = subfa
+    else:
+        subfqs = glob.glob('%s/*.f*q' %(outdir))
+        for subfq in subfqs:
+            fastq_files[subfq] = '1'
+    return fastq_files
+
 
 def shell_runner(cmdline):
     try:
@@ -178,7 +201,8 @@ def main():
     parser.add_argument('--mismatch', default='2', type=int)
     parser.add_argument('--mismatch_junction', default='2', type=int)
     parser.add_argument('--step', default='1234567', type=str)
-    parser.add_argument('--run', dest='run', action='store_true')
+    parser.add_argument('--run', help='run while this script excute', action='store_true')
+    parser.add_argument('--split', help='split fastq into 1 M chunks to run blat/bwa jobs', action='store_true')
     parser.add_argument('-v', dest='verbose', action='store_true')
     args = parser.parse_args()
     
@@ -326,28 +350,38 @@ def main():
 
     #step2 fastq to fasta
     shells_step2 = []
-    fastas = defaultdict(lambda : str)
+    fastq_dict = defaultdict(lambda : str)
     if mode == 'fastq':
         fastqs = glob.glob('%s/*.f*q*' %(fastq_dir))
         step2_flag = 0
         step2_count= 0
         for fq in fastqs:
-            fa    = ''
-            if os.path.splitext(fq)[-1] == '.gz':
-                fa    = '%s.fa' %(os.path.splitext(os.path.splitext(fq)[0])[0])
+            ##split fastq to use multiprocess run jobs
+            if args.split:
+                split_outdir = '%s/repeat/fastq_split' %(args.outdir)
+                if args.aligner == 'blat':
+                    fastq_dict.update(split_fq(fq, split_outdir, 1))
+                elif args.aligner == 'bwa':
+                    fastq_dict.update(split_fq(fq, split_outdir, 0))
+            ##use single file to run blat/bwa job
             else:
-                fa    = '%s.fa' %(os.path.splitext(fq)[0])
-            fastas[fa] = fq
-            if not os.path.isfile(fa):
-                createdir('%s/shellscripts/step_2' %(args.outdir))
-                fq2fa = '%s seq -A %s > %s' %(seqtk, fq, fa)
-                step2_file = '%s/shellscripts/step_2/%s.fq2fa.sh' %(args.outdir, step2_count)
-                if '2' in list(args.step):
-                    shells.append('sh %s' %(step2_file))
-                    shells_step2.append('sh %s' %(step2_file))
-                    writefile(step2_file, fq2fa)
-                step2_flag == 1
-                step2_count += 1
+                fa    = ''
+                if os.path.splitext(fq)[-1] == '.gz':
+                    fa    = '%s.fa' %(os.path.splitext(os.path.splitext(fq)[0])[0])
+                else:
+                    fa    = '%s.fa' %(os.path.splitext(fq)[0])
+                fastq_dict[fq] = fa
+                if not os.path.isfile(fa):
+                    createdir('%s/shellscripts/step_2' %(args.outdir))
+                    fq2fa = '%s seq -A %s > %s' %(seqtk, fq, fa)
+                    step2_file = '%s/shellscripts/step_2/%s.fq2fa.sh' %(args.outdir, step2_count)
+                    if '2' in list(args.step):
+                        shells.append('sh %s' %(step2_file))
+                        shells_step2.append('sh %s' %(step2_file))
+                        writefile(step2_file, fq2fa)
+                    step2_flag == 1
+                    step2_count += 1
+
         if step2_flag == 0:
             step2_file = '%s/shellscripts/step_2_not_needed_fq_already_converted_2_fa' %(args.outdir)
             if '2' in list(args.step):
@@ -370,8 +404,8 @@ def main():
         fq2 = '%s/%s_2.fq' %(fastq_dir, os.path.splitext(os.path.split(bam)[1])[0])
         fa1 = '%s.fa' %(os.path.splitext(fq1)[0])
         fa2 = '%s.fa' %(os.path.splitext(fq2)[0])
-        fastas[fa1] = fq1
-        fastas[fa2] = fq2
+        fastq_dict[fq1] = fa1
+        fastq_dict[fq2] = fa2
         if not os.path.isfile(subbam):
             cmd_step2.append('%s view -h %s | awk \'$5<60\' | samtools view -Shb - | samtools sort -m 500000000 -n - %s 2> %s' %(samtools, bam, os.path.splitext(subbam)[0], run_std))
         if not os.path.isfile(fq1) and not os.path.isfile(fq2):
@@ -398,16 +432,17 @@ def main():
     #step3 blat fasta to repeat
     shells_step3 = []
     step3_count = 0
-    for fa in sorted(fastas.keys()):
+    for fq in sorted(fastq_dict.keys()):
         createdir('%s/shellscripts/step_3' %(args.outdir))
-        fq      = fastas[fa]
+        #fa      = fastq_dict[fq]
         #fq      = '%s.fq' %(os.path.splitext(fa)[0]) if os.path.isfile('%s.fq' %(os.path.splitext(fa)[0])) else '%s.fastq' %(os.path.splitext(fa)[0])
-        fa_prefix = os.path.split(os.path.splitext(fa)[0])[1]
+        fq_prefix = os.path.split(os.path.splitext(fq)[0])[1]
         if args.aligner == 'blat':
-            blatout = '%s/repeat/blat_output/%s.te_repeat.blatout' %(args.outdir, fa_prefix)
+            fa      = fastq_dict[fq]
+            blatout = '%s/repeat/blat_output/%s.te_repeat.blatout' %(args.outdir, fq_prefix)
             blatstd = '%s/repeat/blat_output/blat.out' %(args.outdir)
             blatcmd = '%s -minScore=10 -tileSize=7 %s %s %s 1>>%s 2>>%s' %(blat ,te_fasta, fa, blatout, blatstd, blatstd)
-            flank   = '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fa_prefix)
+            flank   = '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fq_prefix)
             trim    = 'python %s/relocaTE_trim.py %s %s %s %s %s > %s' %(RelocaTE_bin, blatout, fq, args.len_cut_match, args.len_cut_trim, args.mismatch, flank)
             step3_file = '%s/shellscripts/step_3/%s.te_repeat.blat.sh' %(args.outdir, step3_count)
             if not os.path.isfile(blatout) or os.path.getsize(blatout) == 0:
@@ -426,10 +461,10 @@ def main():
                     step3_count += 1
         elif args.aligner == 'bwa':
             #/opt/bwa/0.7.9/bin/bwa mem -t 4 -k 15 -T 10 $genome $read1 | /usr/local/bin/samtools view -Shb -F 4 - > $prefix1.te_repeat.bam
-            bwaout  = '%s/repeat/blat_output/%s.te_repeat.bam' %(args.outdir, fa_prefix)
+            bwaout  = '%s/repeat/blat_output/%s.te_repeat.bam' %(args.outdir, fq_prefix)
             bwastd  = '%s/repeat/blat_output/bwa.out' %(args.outdir)
             bwacmd  = '%s mem -t %s -k 15 -T 10 %s %s | %s view -Shb -F 4 - > %s 2> %s' %(bwa, args.cpu, te_fasta, fq, samtools, bwaout, bwastd)
-            flank   = '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fa_prefix)
+            flank   = '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fq_prefix)
             trim    = 'python %s/relocaTE_trim.py %s %s %s %s %s > %s' %(RelocaTE_bin, bwaout, fq, args.len_cut_match, args.len_cut_trim, args.mismatch, flank)
             step3_file = '%s/shellscripts/step_3/%s.te_repeat.bwa.sh' %(args.outdir, step3_count)
             if not os.path.isfile(bwaout) or os.path.getsize(bwaout) == 0:
@@ -465,7 +500,11 @@ def main():
     if '4' in list(args.step):
         shells.append('sh %s' %(step4_file))
         shells_step4.append('sh %s' %(step4_file))
-        step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, fastq_dir, args.outdir)
+        if args.split:
+            #fq_dir set to '%s/repeat/fastq_split' %(args.outdir)
+            step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s/repeat/fastq_split %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, args.outdir, args.outdir)
+        else:
+            step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, fastq_dir, args.outdir)
         writefile(step4_file, step4_cmd)
     
     #run job in this script
