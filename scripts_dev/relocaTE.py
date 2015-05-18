@@ -463,7 +463,11 @@ def main():
             #/opt/bwa/0.7.9/bin/bwa mem -t 4 -k 15 -T 10 $genome $read1 | /usr/local/bin/samtools view -Shb -F 4 - > $prefix1.te_repeat.bam
             bwaout  = '%s/repeat/blat_output/%s.te_repeat.bam' %(args.outdir, fq_prefix)
             bwastd  = '%s/repeat/blat_output/bwa.out' %(args.outdir)
-            bwacmd  = '%s mem -t %s -k 15 -T 10 %s %s | %s view -Shb -F 4 - > %s 2> %s' %(bwa, args.cpu, te_fasta, fq, samtools, bwaout, bwastd)
+            bwacmd  = ''
+            if args.split:
+                bwacmd  = '%s mem -t %s -k 15 -T 10 %s %s | %s view -Shb -F 4 - > %s 2> %s' %(bwa, 1, te_fasta, fq, samtools, bwaout, bwastd)
+            else:
+                bwacmd  = '%s mem -t %s -k 15 -T 10 %s %s | %s view -Shb -F 4 - > %s 2> %s' %(bwa, args.cpu, te_fasta, fq, samtools, bwaout, bwastd)
             flank   = '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fq_prefix)
             trim    = 'python %s/relocaTE_trim.py %s %s %s %s %s > %s' %(RelocaTE_bin, bwaout, fq, args.len_cut_match, args.len_cut_trim, args.mismatch, flank)
             step3_file = '%s/shellscripts/step_3/%s.te_repeat.bwa.sh' %(args.outdir, step3_count)
@@ -489,6 +493,11 @@ def main():
                 single_run(shells_step3)
             else:
                 mp_pool(shells_step3, int(args.cpu)) 
+        elif args.aligner == 'bwa' and args.split:
+            if int(args.cpu) == 1:
+                single_run(shells_step3)
+            else:
+                mp_pool(shells_step3, int(args.cpu))
         elif args.aligner == 'bwa':
             single_run(shells_step3)
 
@@ -502,9 +511,9 @@ def main():
         shells_step4.append('sh %s' %(step4_file))
         if args.split:
             #fq_dir set to '%s/repeat/fastq_split' %(args.outdir)
-            step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s/repeat/fastq_split %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, args.outdir, args.outdir)
+            step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s/repeat/fastq_split %s/regex.txt repeat not.given 0 %s' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, args.outdir, args.outdir, args.cpu)
         else:
-            step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s %s/regex.txt repeat not.given 0' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, fastq_dir, args.outdir)
+            step4_cmd = 'python %s/relocaTE_align.py %s %s/repeat %s %s %s/regex.txt repeat not.given 0 %s' %(RelocaTE_bin, RelocaTE_bin, args.outdir, reference, fastq_dir, args.outdir, args.cpu)
         writefile(step4_file, step4_cmd)
     
     #run job in this script
