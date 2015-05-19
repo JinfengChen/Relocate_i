@@ -51,7 +51,6 @@ def split_fq(fastq, outdir, fa_flag):
     fastq_files = defaultdict(lambda : str())
     seqtk = '/rhome/cjinfeng/software/tools/seqtk-master//seqtk'
     fastq_split = 'perl /rhome/cjinfeng/software/bin/fastq_split.pl'
-    createdir(outdir)
     #do not split if file already exist
     test_fq = '%s/p00.%s' %(outdir, fastq) 
     if os.path.isfile(test_fq):
@@ -62,22 +61,35 @@ def split_fq(fastq, outdir, fa_flag):
                 fastq_files[subfq] = subfa
             else:
                 fastq_files[subfq] = '1'
-        return fastq_files
+        return sorted(fastq_files.keys())
     #split
     os.system('%s -s 1000000 -o %s %s' %(fastq_split, outdir, fastq))
     if int(fa_flag) == 1:
         subfqs = glob.glob('%s/*.f*q' %(outdir))
         for subfq in subfqs:
             subfa = '%s.fa' %(os.path.splitext(subfq)[0])
-            fq2fa = '%s seq -A %s > %s' %(seqtk, subfq, subfa)
-            os.system(fq2fa)
+            #fq2fa = '%s seq -A %s > %s' %(seqtk, subfq, subfa)
+            #os.system(fq2fa)
             fastq_files[subfq] = subfa
     else:
         subfqs = glob.glob('%s/*.f*q' %(outdir))
         for subfq in subfqs:
             fastq_files[subfq] = '1'
-    return fastq_files
+    return sorted(fastq_files.keys())
 
+
+def split_fq_helper(args):
+    return split_fq(*args)
+
+##run function with parameters using multiprocess of #cpu
+def mp_pool_function(function, parameters, cpu):
+    pool = mp.Pool(int(cpu))
+    imap_it = pool.map(function, tuple(parameters))
+    collect_list = []
+    for x in imap_it:
+        print 'status: %s' %(x)
+        collect_list.append(x)
+    return collect_list
 
 def shell_runner(cmdline):
     try:
@@ -362,21 +374,67 @@ def main():
     #step2 fastq to fasta
     shells_step2 = []
     fastq_dict = defaultdict(lambda : str)
-    if mode == 'fastq':
+    if mode == 'fastq' and args.split:
+        fastqs = glob.glob('%s/*.f*q*' %(fastq_dir))
+        step2_flag   = 0
+        step2_count  = 0
+        split_outdir = '%s/repeat/fastq_split' %(args.outdir)
+        createdir(split_outdir)
+        parameters   = []
+        fa_convert   = 0 if args.aligner == 'bwa' else 1
+        for fq in fastqs:
+            parameters.append([fq, split_outdir, fa_convert])
+        ##split fastq to use multiprocess run jobs
+        #collect_list_dict = mp_pool_function(split_fq_helper, parameters, args.cpu)
+        collect_list_list = mp_pool_function(split_fq_helper, parameters, args.cpu)
+        ##collection and update fastq->fasta/1 dictionary
+        #for fq_dict in collect_list_dict:
+        #    fastq_dict.update(fq_dict)
+        for fq_list in collect_list_list:
+            for fq_subfile in fq_list:
+                if fa_convert == 1:
+                    fa_subfile = '%s.fa' %(os.path.splitext(fq_subfile)[0])
+                    fastq_dict[fq_subfile] = fa_subfile
+                else:
+                    fastq_dict[fq_subfile] = '1'
+        ##convert fastq to fasta use multiprocess run jobs
+        if fa_convert == 1:
+            test_fa = fastq_dict.values()[0]
+            if not os.path.isfile(test_fa) and '2' in list(args.step):
+                createdir('%s/shellscripts/step_2' %(args.outdir))
+                for subfq in sorted(fastq_dict.keys()):
+                    subfa = fastq_dict[subfq] 
+                    fq2fa = '%s seq -A %s > %s' %(seqtk, subfq, subfa)
+                    step2_file  = '%s/shellscripts/step_2/%s.fq2fa.sh' %(args.outdir, step2_count)
+                    step2_count += 1
+                    shells.append('sh %s' %(step2_file))
+                    shells_step2.append('sh %s' %(step2_file))
+                    writefile(step2_file, fq2fa)
+            elif os.path.isfile(test_fa) and '2' in list(args.step):
+                step2_file = '%s/shellscripts/step_2_not_needed_fq_already_converted_2_fa' %(args.outdir)
+                writefile(step2_file, '')
+            #run job in this script
+            if args.run and len(shells_step2) > 0 and '2' in list(args.step):
+                if int(args.cpu) == 1:
+                    single_run(shells_step2)
+                else:
+                    mp_pool(shells_step2, int(args.cpu))
+
+    elif mode == 'fastq':
         fastqs = glob.glob('%s/*.f*q*' %(fastq_dir))
         step2_flag = 0
         step2_count= 0
-
         for fq in fastqs:
             ##split fastq to use multiprocess run jobs
-            if args.split:
-                split_outdir = '%s/repeat/fastq_split' %(args.outdir)
-                if args.aligner == 'blat':
-                    fastq_dict.update(split_fq(fq, split_outdir, 1))
-                elif args.aligner == 'bwa':
-                    fastq_dict.update(split_fq(fq, split_outdir, 0))
+            #if args.split:
+            #    split_outdir = '%s/repeat/fastq_split' %(args.outdir)
+            #    if args.aligner == 'blat':
+            #        fastq_dict.update(split_fq(fq, split_outdir, 1))
+            #    elif args.aligner == 'bwa':
+            #        fastq_dict.update(split_fq(fq, split_outdir, 0))
             ##use single file to run blat/bwa job
-            else:
+            #else:
+            if 1:
                 fa    = ''
                 if os.path.splitext(fq)[-1] == '.gz':
                     fa    = '%s.fa' %(os.path.splitext(os.path.splitext(fq)[0])[0])
