@@ -50,9 +50,20 @@ def writefile(outfile, lines):
 def split_fq(fastq, outdir, fa_flag):
     fastq_files = defaultdict(lambda : str())
     seqtk = '/rhome/cjinfeng/software/tools/seqtk-master//seqtk'
-    fastq_split = 'perl /rhome/cjinfeng/software/bin/fastq_split.pl' 
-    if not os.path.exists(outdir):
-        os.mkdir(outdir)
+    fastq_split = 'perl /rhome/cjinfeng/software/bin/fastq_split.pl'
+    createdir(outdir)
+    #do not split if file already exist
+    test_fq = '%s/p00.%s' %(outdir, fastq) 
+    if os.path.isfile(test_fq):
+        subfqs = glob.glob('%s/*.f*q' %(outdir))
+        for subfq in subfqs:
+            subfa = '%s.fa' %(os.path.splitext(subfq)[0])
+            if int(fa_flag) == 1:
+                fastq_files[subfq] = subfa
+            else:
+                fastq_files[subfq] = '1'
+        return fastq_files
+    #split
     os.system('%s -s 1000000 -o %s %s' %(fastq_split, outdir, fastq))
     if int(fa_flag) == 1:
         subfqs = glob.glob('%s/*.f*q' %(outdir))
@@ -355,6 +366,7 @@ def main():
         fastqs = glob.glob('%s/*.f*q*' %(fastq_dir))
         step2_flag = 0
         step2_count= 0
+
         for fq in fastqs:
             ##split fastq to use multiprocess run jobs
             if args.split:

@@ -167,7 +167,7 @@ def bwa_run(path, genome_file, fastq, fq_name, target, readclass, bwa, samtools)
     cmd = []
     cmd.append('%s aln %s %s > %s/bwa_aln/%s.%s.bwa.%s.sai' %(bwa, genome_file, fastq, path, target, fq_name, readclass))
     cmd.append('%s samse %s %s/bwa_aln/%s.%s.bwa.%s.sai %s | %s view -bhS - > %s/bwa_aln/%s.%s.bwa.%s.bam' %(bwa, genome_file, path, target, fq_name, readclass, fastq, samtools, path, target, fq_name, readclass))
-    cmd.append('rm %s/bwa_aln/*.bwa.*.sai' %(path))
+    cmd.append('rm %s/bwa_aln/%s.%s.bwa.%s.sai' %(path, target, fq_name, readclass))
     os.system('\n'.join(cmd))
     #print '\n'.join(cmd)
 
@@ -177,7 +177,8 @@ def bwa_run_paired(path, genome_file, fastq1, fastq2, fq_name, target, bwa, samt
     cmd.append('%s aln %s %s > %s/bwa_aln/%s.%s.bwa.mates.sai' %(bwa, genome_file, fastq1, path, target, os.path.split(os.path.splitext(fastq1)[0])[1]))
     cmd.append('%s aln %s %s > %s/bwa_aln/%s.%s.bwa.mates.sai' %(bwa, genome_file, fastq2, path, target, os.path.split(os.path.splitext(fastq2)[0])[1]))
     cmd.append('%s sampe %s %s/bwa_aln/%s.%s.bwa.mates.sai %s/bwa_aln/%s.%s.bwa.mates.sai %s %s | %s view -bhS - > %s/bwa_aln/%s.%s.bwa.mates.bam' %(bwa, genome_file, path, target, os.path.splitext(os.path.split(fastq1)[1])[0], path, target, os.path.splitext(os.path.split(fastq2)[1])[0], fastq1, fastq2, samtools, path, target, fq_name))
-    cmd.append('rm %s/bwa_aln/*.bwa.mates.sai' %(path))
+    cmd.append('rm %s/bwa_aln/%s.%s.bwa.mates.sai' %(path, target, os.path.split(os.path.splitext(fastq1)[0])[1]))
+    cmd.append('rm %s/bwa_aln/%s.%s.bwa.mates.sai' %(path, target, os.path.split(os.path.splitext(fastq2)[0])[1]))
     os.system('\n'.join(cmd))
     #print '\n'.join(cmd)
 
