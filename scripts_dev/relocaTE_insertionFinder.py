@@ -193,11 +193,14 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
                 reads.extend(teInsertions_reads[event][start][foundTSD]['read'])
                 left_jun_reads.extend(teInsertions_reads[event][start][foundTSD]['left_read'])
                 right_jun_reads.extend(teInsertions_reads[event][start][foundTSD]['right_read'])
+                print 'TSD count: %s, %s' %(foundTSD, tsd_count[foundTSD])
 
-            tsd_top = OrderedDict(sorted(tsd_count.items(), key=lambda x: x[1])).keys()[-1] 
+            tsd_top = OrderedDict(sorted(tsd_count.items(), key=lambda x: x[1])).keys()[-1]
+            foundTSD= tsd_top 
             TE_orient         = '+' if int(TE_orient_foward) > int(TE_orient_reverse) else '-'
             repeat_junction   = insertion_family(','.join(reads), read_repeat)
 
+            print 'tsd_top: %s, %s' %(tsd_top, tsd_count[tsd_top])
             print 'reads: %s' %(','.join(reads))
             print 'left: %s' %(','.join(left_jun_reads))
             print 'right: %s' %(','.join(right_jun_reads))
