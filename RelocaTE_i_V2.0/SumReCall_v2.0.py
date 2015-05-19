@@ -40,7 +40,42 @@ def parse_ref_gff(infile):
     return data
 
 
+#Chr3    MSU7    Gaijin  472029  472030  .       -       .       ID=Gaijin.Chr3.472029;TSD=CTT;
 def parse_overlap_reloacte(infile, ref_te, call_te):
+    #Total number of call, true call, call with breakpoint near TSD, No call, False call
+    data = defaultdict(lambda : int)
+    dupli= defaultdict(lambda : int())
+    true = 0
+    tsd  = 0
+    r = re.compile(r'TSD=(\w+);')
+    with open (infile, 'r') as filehd:
+        for line in filehd:
+            line = line.rstrip()
+            if len(line) > 2: 
+                unit = re.split(r'\t',line)
+                #print line
+                if dupli.has_key('%s_%s' %(unit[12], unit[13])):
+                    continue
+                else:
+                    dupli['%s_%s' %(unit[12], unit[13])] == 1
+                #print 'pass'
+                tsd_wd = r.search(unit[8]).groups(0)[0] if r.search(unit[8]) else 'NA'
+                tsd_s  = int(unit[3]) - len(tsd_wd) + 1
+                tsd_e  = int(unit[3])
+                if int(unit[12]) == int(tsd_s) and int(unit[13]) == int(tsd_e):
+                    tsd += 1
+                #pos  = map(int, [unit[3], unit[4], unit[12], unit[13]])
+                #dist_min = min([abs(pos[2]-pos[0]), abs(pos[2]-pos[1]), abs(pos[3]-pos[0]), abs(pos[3]-pos[1])])
+                #dist_max = max([abs(pos[2]-pos[0]), abs(pos[2]-pos[1]), abs(pos[3]-pos[0]), abs(pos[3]-pos[1])])
+                true += 1
+                #if dist_min <= 10 and dist_min <= 10:
+                    #tsd += 1
+    call = len(call_te.keys())
+    ref  = len(ref_te.keys())
+    data = [call, true, tsd, ref-true, call-true]
+    return data
+
+def parse_overlap_reloacte1(infile, ref_te, call_te):
     #Total number of call, true call, call with breakpoint near TSD, No call, False call
     data = defaultdict(lambda : int)
     dupli= defaultdict(lambda : int())
