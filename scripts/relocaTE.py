@@ -63,7 +63,7 @@ def split_fq(fastq, outdir, fa_flag):
                 fastq_files[subfq] = '1'
         return sorted(fastq_files.keys())
     #split
-    os.system('%s -s 1000000 -o %s %s' %(fastq_split, outdir, fastq))
+    os.system('%s -s 200000 -o %s %s' %(fastq_split, outdir, fastq))
     if int(fa_flag) == 1:
         subfqs = glob.glob('%s/*.f*q' %(outdir))
         for subfq in subfqs:

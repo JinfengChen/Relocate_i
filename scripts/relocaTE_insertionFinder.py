@@ -248,15 +248,22 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
                     #we only keep these supported by junction at both direction
                     #even some supported by more than 1 junction reads, we thought due to sequence context
                     #these insertions should have junction at both direction if they are true
+                    #now include these single junctions with more than 3 junctions reads support becasue we have more filters before and after
                     print 'we have tsd supported by junction at both direction'
                     for start_it in start_collection:
-                        if int(start_it[3]) > 0 and int(start_it[4] > 0):
+                        if int(start_it[3]) > 0 and int(start_it[4]) > 0:
+                            #both junction
+                            cluster_collection.append(start_it)
+                        elif int(start_it[3]) >= 3 or int(start_it[4]) >= 3:
+                            #single junction
                             cluster_collection.append(start_it)
                         else:
                             continue
                             #for these cluster, we automaticly remove these with only one junction
                             #due to the local coverage, if we found both junction for one insertion
-                            #we should find both junction for others too 
+                            #we should find both junction for others too
+                            #only remove these low supporting junctions in this case
+                            
                 else:
                     #do not have tsd supported by junction at both direction
                     #we keep the top one with higher number of junction reads
@@ -270,15 +277,18 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
                             continue
                             #remove if overlap with existingTE
                         else:
-                            if int(top_start_junction) < int(start_it[2]):
-                                top_start_junction = int(start_it[2])
-                                top_start_it       = start_it
-                    if top_start_junction > 0:
-                        cluster_collection.append(top_start_it)
-                    else:
-                        ##all removed due to overlap with existingTE
-                        continue
-                        #del teInsertions[event]
+                            #if int(top_start_junction) < int(start_it[2]):
+                            #    top_start_junction = int(start_it[2])
+                            #    top_start_it       = start_it
+                            #keep all these single junctions that have more than three supporting junctions
+                            if int(start_it[2]) >= 3:
+                                cluster_collection.append(start_it)
+                    #if top_start_junction > 0:
+                    #    cluster_collection.append(top_start_it)
+                    #else:
+                    #    ##all removed due to overlap with existingTE
+                    #    continue
+                    #    #del teInsertions[event]
         else:
             #only one tsd found
             print "only one tsd found"
@@ -1255,6 +1265,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             chro   = rnames[record.reference_id]
             end    = int(start) + int(length) - 1 #should not allowed for indel or softclip
 
+            #print 'find_insertion_bam: %s\t%s' %(name, start)
             #filter false junctions
             if r.search(name):
                 read_order = 0
@@ -1263,6 +1274,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                 elif record.is_read2:
                     read_order = 2
                 jun_read_name = r.search(name).groups(0)[0]
+                #print '%s\t%s\t%s' %(name, jun_read_name, read_order)
                 if jun_read_name[-2:] == '/1':
                     if teJunctionReads[jun_read_name[:-2]][1] == 1:
                         continue
@@ -1270,7 +1282,11 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                     if teJunctionReads[jun_read_name[:-2]][2] == 1:
                         continue
                 else:
-                    if teJunctionReads[jun_read_name][read_order] == 1:
+                    if teJunctionReads[jun_read_name][1] == 1 and teJunctionReads[jun_read_name][2] == 1:
+                        #both reads are perfect matched
+                        #in case the read is not paired because the pairs is in repeat
+                        continue
+                    elif teJunctionReads[jun_read_name][read_order] == 1:
                         continue
 
             strand = ''
@@ -1434,11 +1450,13 @@ def read_junction_reads_align(align_file_f, teJunctionReads):
             tag    = record.tags if record.tags else []
             chro   = rnames[record.reference_id]
             match  = 0
+            #print '%s\t%s\t%s' %(name, read_order, tag)
             for (key, length) in record.cigartuples:
                 #print key, length
                 if int(key) == 0:
                     match += length
             if int(MAPQ) >= 29 and match >= len(seq) - 3:
+                print '%s' %(name)
                 teJunctionReads[name][read_order] = 1
         else:
             name   = record.query_name
