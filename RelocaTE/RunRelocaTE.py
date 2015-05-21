@@ -92,7 +92,7 @@ def main():
                 outdir = '%s_RelocaTE' %(os.path.split(read_pre)[1])
                 # relocate will not run if there is result exists
                 if not os.path.exists('./%s/%s' %(rep_read_dir, outdir)):
-                    relocaTE = '%s -t %s -g %s -d %s -e %s -o %s -r 1 -p 1 -a 0' %(RelocaTE, Repeat, Reference, read_dir, 'HEG4', outdir)
+                    relocaTE = '%s -t %s -g %s -d %s -e %s -o %s -r 1 -p 1 -a 0 -1 _1 -2 _2' %(RelocaTE, Repeat, Reference, read_dir, 'HEG4', outdir)
                     shell    = 'bash ./%s/run_these_jobs.sh > ./%s/run.log 2>&1' %(outdir, outdir)
                     mv       = 'mv %s %s' %(outdir, rep_read_dir)
                     os.system(relocaTE)
