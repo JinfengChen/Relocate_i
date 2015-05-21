@@ -32,54 +32,14 @@ def parse_ref_gff(infile):
     with open (infile, 'r') as filehd:
         for line in filehd:
             line = line.rstrip()
-            if len(line) > 2 and not line.startswith(r'#'):
-                #print line 
+            if len(line) > 2: 
                 unit = re.split(r'\t',line)
                 te   = '%s_%s_%s' %(unit[0], unit[3], unit[4])
                 data[te] = 1
     return data
 
 
-#Chr3    MSU7    Gaijin  472029  472030  .       -       .       ID=Gaijin.Chr3.472029;TSD=CTT;
 def parse_overlap_reloacte(infile, ref_te, call_te):
-    #Total number of call, true call, call with breakpoint near TSD, No call, False call
-    data = defaultdict(lambda : int)
-    dupli= defaultdict(lambda : int())
-    true = 0
-    tsd  = 0
-    #print '>infile'
-    r = re.compile(r'TSD=(\w+);')
-    with open (infile, 'r') as filehd:
-        for line in filehd:
-            line = line.rstrip()
-            if len(line) > 2: 
-                unit = re.split(r'\t',line)
-                #print line
-                if dupli.has_key('%s_%s' %(unit[12], unit[13])):
-                    continue
-                else:
-                    dupli['%s_%s' %(unit[12], unit[13])] == 1
-                #print 'pass'
-                tsd_wd = r.search(unit[8]).groups(0)[0] if r.search(unit[8]) else 'NA'
-                tsd_s  = int(unit[3]) - len(tsd_wd) + 1
-                tsd_e  = int(unit[3])
-                if int(unit[12]) == int(tsd_s) and int(unit[13]) == int(tsd_e):
-                    tsd += 1
-                #else:
-                #    print line
-                #pos  = map(int, [unit[3], unit[4], unit[12], unit[13]])
-                #dist_min = min([abs(pos[2]-pos[0]), abs(pos[2]-pos[1]), abs(pos[3]-pos[0]), abs(pos[3]-pos[1])])
-                #dist_max = max([abs(pos[2]-pos[0]), abs(pos[2]-pos[1]), abs(pos[3]-pos[0]), abs(pos[3]-pos[1])])
-                true += 1
-                #if dist_min <= 10 and dist_min <= 10:
-                    #tsd += 1
-    call = len(call_te.keys())
-    ref  = len(ref_te.keys())
-    data = [call, true, tsd, ref-true, call-true]
-    #print '%s\t%s\t%s' %(call, true, tsd)
-    return data
-
-def parse_overlap_reloacte1(infile, ref_te, call_te):
     #Total number of call, true call, call with breakpoint near TSD, No call, False call
     data = defaultdict(lambda : int)
     dupli= defaultdict(lambda : int())
@@ -131,9 +91,7 @@ def main():
         #print rep_read
         #print rep_read_dir
         calls = glob.glob('%s/*.*_%s' %(rep_read_dir, args.call))
-        for call in calls:
-            #if not '40' in call:
-            #    continue
+        for call in calls: 
             #MSU7.Chr4.mPing.rep1_reads_10X_100_500_RelocaTE
             unit = re.split(r'_', os.path.split(call)[1])
             head = re.split(r'\.', unit[0])
@@ -180,16 +138,12 @@ def main():
                     #print index
                     #print '%s\t%s\t%s\t%s\t%s' %(eval_list[0], eval_list[1], eval_list[2], eval_list[3], eval_list[4])
             elif args.call == 'RelocaTEi':
-                #print call
                 non_ref_txt = '%s/repeat/results/%s.repeat.all_nonref_insert.txt' %(call, chro)
                 non_ref_gff = '%s/repeat/results/%s.repeat.all_nonref_insert.gff' %(call, chro)
-                non_ref_gff_char = '%s/repeat/results/ALL.all_nonref_insert.characTErized.gff' %(call)
-                non_ref_gff_all  = '%s/repeat/results/ALL.all_nonref_insert.gff' %(call)
                 convertgff  = 'perl /rhome/cjinfeng/software/bin/relocate2gff.pl --mping %s' %(non_ref_txt)
                 if not os.path.isfile(non_ref_gff):
                     os.system(convertgff)
-                #os.system('cp %s temp.relocate.gff' %(non_ref_gff))
-                os.system('cp %s temp.relocate.gff' %(non_ref_gff_all))
+                os.system('cp %s temp.relocate.gff' %(non_ref_gff))
                 win_overlap= 'bedtools window -w 100 -a %s -b temp.relocate.gff > temp.relocate.overlap' %(ref_gff)
                 os.system(win_overlap)
                 call_te = parse_ref_gff('temp.relocate.gff')

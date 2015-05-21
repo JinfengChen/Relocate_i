@@ -77,7 +77,16 @@ def Overlap_TE_boundary(prefix, refte):
                         temp[idx] = value
                 if int(temp['Right_junction_reads']) == 0 or int(temp['Left_junction_reads']) == 0:
                     #support by one junction
-                    print >> ofile, '\t'.join(unit[:9])
+                    #within 10 bp interval of intact TE boundary
+                    #print >> ofile, '\t'.join(unit[:9])
+                    if int(unit[3]) >= int(unit[10]) - 10 and int(unit[3]) <= int(unit[10]) + 10:
+                        print >> ofile, '\t'.join(unit[:9])
+                    elif int(unit[3]) >= int(unit[11]) - 10 and int(unit[3]) <= int(unit[11]) + 10:
+                        print >> ofile, '\t'.join(unit[:9])
+                    elif int(unit[4]) >= int(unit[10]) - 10 and int(unit[4]) <= int(unit[10]) + 10:
+                        print >> ofile, '\t'.join(unit[:9])
+                    elif int(unit[4]) >= int(unit[11]) - 10 and int(unit[4]) <= int(unit[11]) + 10:
+                        print >> ofile, '\t'.join(unit[:9])
     ofile.close()
     if not os.path.isfile(outfile) or not os.path.getsize(outfile) > 0:
         return 1
