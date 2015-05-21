@@ -1,0 +1,30 @@
+#echo "MSU7.Chr4.mPing"
+#python RunITIS.py --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/MSU7.Chr4.mPing --genome /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/MSU7.Chr4.fa --repeat /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/mping.fa 
+#python Move.py --input MSU7.Chr4.mPing
+#python SumReCall.py --call ITIS --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/MSU7.Chr4.mPing
+
+#echo "MSU7.Chr4.ALL"
+#python RunITIS.py --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/MSU7.Chr4.ALL --genome /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/MSU7.Chr4.fa --repeat /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/RiceTE.fa
+#python Move.py --input MSU7.Chr4.ALL
+#python SumReCall.py --call ITIS --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/MSU7.Chr4.ALL
+
+#echo "MSU7.Chr3.mPing"
+#python RunITIS.py --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/MSU7.Chr3.mPing --genome /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/MSU7.Chr3.fa --repeat /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/mping.fa
+#python Move.py --input MSU7.Chr3.mPing
+#python SumReCall.py --call ITIS --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/MSU7.Chr3.mPing
+
+#echo "MSU7.Chr3.ALL"
+python RunITIS.py --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/MSU7.Chr3.ALL --genome /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/MSU7.Chr3.fa --repeat /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/RiceTE.fa
+#python Move.py --input MSU7.Chr3.ALL
+#python SumReCall.py --call ITIS --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/MSU7.Chr3.ALL
+
+#echo "FLY603.Chr2L.pogo"
+#python RunRelocaTEi.py --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/FLY603.Chr2L.pogo --genome /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/FLY603.Chr2L.fa --repeat /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/pogo.fa
+#python RunRelocaTEi_bam.py --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/ReadMapping/FLY603.Chr2L.pogo --genome /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/FLY603.Chr2L.fa --repeat /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/pogo.fa
+#python SumReCall.py --call RelocaTEi --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/FLY603.Chr2L.pogo
+
+#echo "TAIR10.Chr1.mPing"
+#python RunRelocaTEi.py --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/TAIR10.Chr1.mPing --genome /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/TAIR10.Chr1.fa --repeat /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/mping.fa
+#python RunRelocaTEi_bam.py --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/ReadMapping/TAIR10.Chr1.mPing --genome /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/TAIR10.Chr1.fa --repeat /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/Reference/mping.fa
+#python SumReCall.py --call RelocaTEi --input /rhome/cjinfeng/BigData/00.RD/RelocaTE_i/Simulation/TAIR10.Chr1.mPing
+
