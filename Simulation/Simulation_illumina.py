@@ -51,9 +51,14 @@ def main():
         args.size = 500
  
     read_len = 100
-    depth  = [1, 2]
-    #depth = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20]
+    #depth  = [10, 20, 40]
+    depth = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 40]
     pirs = '/rhome/cjinfeng/software/tools/TE_diversity/pirs/pirs'
+    BFILE = '/rhome/cjinfeng/software/tools/TE_diversity/pirs/Profiles/Base-Calling_Profiles/humNew.PE100.matrix.gz'
+    IFILE = '/rhome/cjinfeng/software/tools/TE_diversity/pirs/Profiles/InDel_Profiles/phixv2.InDel.matrix'
+    GFILE = '/rhome/cjinfeng/software/tools/TE_diversity/pirs/Profiles/GC-depth_Profiles/humNew.gcdep_200.dat'
+    
+
     files = glob.glob('%s/*.fasta' %(args.input))
     for fa in files:
         print fa
@@ -61,12 +66,17 @@ def main():
         if not os.path.exists(read_dir):
             os.mkdir(read_dir)
         for dep in depth:
-            read_pre = '%s_%s' %(read_dir, dep)
-            cmd = '%s simulate %s -m %s -x %s -l %s -o %s > %s_%s_%s.o 2> %s_%s_%s.e' %(pirs, fa, args.size, dep, read_len, read_pre, read_pre, read_len, args.size, read_pre, read_len, args.size)
-            mv  = 'mv %s.* %s' %(read_dir, read_dir)
-            os.system(cmd)
-            os.system(mv)
-            #print '%s\n%s' %(cmd, mv)
+            read_pre = '%s_%sX' %(read_dir, dep)
+            #use dep as rand seed
+            cmd = '%s simulate %s -m %s -v %s -x %s -l %s -t 1 -S %s -o %s -B %s -I %s -G %s > %s_%s_%s.o 2> %s_%s_%s.e' %(pirs, fa, args.size, int(float(args.size) * 0.2), dep, read_len, dep, read_pre, BFILE, IFILE, GFILE, read_pre, read_len, args.size, read_pre, read_len, args.size)
+            mv  = 'mv %s_* %s' %(read_dir, read_dir)
+            #Mix.ALL.Repeat.rep1_reads_10X_100_500_1.fq
+            fqout = '%s/%s_%sX_%s_%s_1.fq' %(read_dir, os.path.split(read_dir)[1], dep, read_len, args.size)
+            #print fqout
+            if not os.path.isfile(fqout):
+                os.system(cmd)
+                os.system(mv)
+                #print '%s\n%s' %(cmd, mv)
 
 if __name__ == '__main__':
     main()

@@ -13,7 +13,7 @@ import random
 def usage():
     test="name"
     message='''
-python Simulation_TE_Insertion.py --repeat mping.fa --genome MSU_r7.fa --te mPing  --chr Chr4 --number 200
+python Simulation_MultiTE_Insertion.py --repeat mping.fa --genome MSU_r7.fa --te mPing  --chr Chr4 --number 200
 
 Given the TE and genome sequence, simulate random insertion site in the genome or individual chromosome
 
@@ -40,9 +40,8 @@ def fasta_te(fastafile, te):
     fastatsd = defaultdict(list)
     ids = []
     for record in SeqIO.parse(fastafile, "fasta"):
-        if te == str(record.id):
-            fastaid[record.id] = str(record.seq)
-            ids.append(str(record.id))
+        fastaid[record.id] = str(record.seq)
+        ids.append(str(record.id))
     #get tsd
     s = re.compile(r'>(.\S+)\s+TSD\=(.*)')
     disc = SeqIO.index(fastafile, "fasta")
@@ -68,44 +67,53 @@ def fasta_ref(fastafile):
     return fastaid
 
 ##random choose pos from chromosome
-def random_pos(chrn, ref, tsd):
+def random_pos(chrn, ref, repid, repseq, reptsd):
     seq_len = len(ref[chrn])
     rand_pos= random.randint(1,seq_len)
     strand  = 1 if random.randint(1,10) > 5 else 0
     #tsd
-    tsdstart = rand_pos - len(tsd)
+    tsdstart = rand_pos - len(reptsd)
     chrseq   = ref[chrn]
     tsdseq   = chrseq[tsdstart:rand_pos]
     #tsdseq   = chrseq[tsdstart:rand_pos] if strand == 1 else str(Seq(chrseq[tsdstart:rand_pos]).reverse_complement())
-    return [chrn, rand_pos, rand_pos+1, strand, tsdseq]
+    return [chrn, rand_pos, rand_pos+1, strand, repid, repseq, tsdseq]
 
 ##except for the for insertion, all the following insertion need to add inserted sequence to their position
-def update_pos(data, repseq, tsd):
+def update_pos(data):
     ##tsd only add one copy of itself
-    add_len = len(repseq) + 1*len(tsd)
-    add_num = defaultdict(int)
+    #add_len = len(repseq) + 1*len(tsd)
+    add_total = defaultdict(int)
     for i in range(0, len(data)):
         chrn  = data[i][0]
         start = data[i][1]
         end   = data[i][2]
+        repid = data[i][4] 
+        repseq= data[i][5]
+        reptsd= data[i][6]
+        add_len = len(repseq) + 1*len(reptsd)
+        
         #print chrn, start, end
-        if add_num.has_key(chrn):
-            data[i][1] = start + add_num[chrn]*add_len
-            data[i][2] = end   + add_num[chrn]*add_len
-            add_num[chrn] += 1
+        if add_total.has_key(chrn):
+            # add previous insertion length to the coordinate
+            data[i][1] = start + add_total[chrn]
+            data[i][2] = end   + add_total[chrn]
+            add_total[chrn] += add_len
         else:
-            add_num[chrn] += 1
+            # first insertion, no change to the coordinate
+            add_total[chrn] = add_len
         #print data[i][0], data[i][1], data[i][2]
     return data
 
 ##insertion element into genome
-def insert_element(pos, repseq, tsd, ref):
+def insert_element(pos, ref):
     chrn = pos[0]
     chrseq = ref[chrn]
     half1 = chrseq[:pos[1]]
     half2 = chrseq[pos[1]:]
+    repseq=pos[5]
+    reptsd=pos[6]
     ##we choose sequence at target site as tsd, not use tsd provided
-    tsdstart = pos[1] - len(tsd)
+    tsdstart = pos[1] - len(reptsd)
     tsdseq   = chrseq[tsdstart:pos[1]]
     newseq   = ''
     if pos[3] == 1:
@@ -117,41 +125,58 @@ def insert_element(pos, repseq, tsd, ref):
     ref[chrn] = newseq
 
 ##write simulated insertion into gff format
-def writegff(data, te, gff_out):
+def writegff(data, gff_out):
     ofile = open(gff_out, 'w') 
     for pos in data:
         chrn   = pos[0]
         start  = pos[1]
         end    = pos[2]
         strand = '+' if pos[3] == 1 else '-'
-        tsd    = pos[4]
-        te_id  = '%s.%s.%s' %(te, chrn, str(start))
-        print >> ofile, '%s\tMSU7\t%s\t%s\t%s\t.\t%s\t.\tID=%s;TSD=%s;' %(chrn, te, str(start), str(end), strand, te_id, tsd)
+        repid  = pos[4]
+        repseq = pos[5]
+        reptsd = pos[6]
+        te_id  = '%s.%s.%s' %(repid, chrn, str(start))
+        print >> ofile, '%s\tMSU7\t%s\t%s\t%s\t.\t%s\t.\tID=%s;TSD=%s;' %(chrn, repid, str(start), str(end), strand, te_id, reptsd)
+
+def pick_te(element, te):
+    if te == 'ALL':
+        te_ids = sorted(element.keys())
+        te_num = len(element.keys())
+        #print te_num
+        index  = random.randint(1, int(te_num))
+        te_inf = [te_ids[index-1], element[te_ids[index-1]][0], element[te_ids[index-1]][1]]
+    else:
+        te_inf = [te, element[te][0], element[te][1]]
+    return te_inf
 
 ##main function of simulation
-def simulate(ref, repseq, tsd, te, chrs, number, prefix):
+def simulate(ref, element, te, chrs, number, prefix):
     data = []
     #print repseq
     for n in range(int(number)):
         #print 'Rank %s' %(n)
+        te_inf = pick_te(element, te)
+        repid = te_inf[0]
+        repseq= te_inf[1]
+        reptsd= te_inf[2]
         if chrs == 'ALL':
             c = random.randint(1,12)
             chrn = 'Chr%s' %(c)
-            ins  = random_pos(chrn, ref, tsd)
+            ins  = random_pos(chrn, ref, repid, repseq, reptsd)
             data.append(ins)
             #print ins[0], ins[1], ins[2]
         else:
-            ins  = random_pos(chrs, ref, tsd)
+            ins  = random_pos(chrs, ref, repid, repseq, reptsd)
             data.append(ins)
  
     data = sorted(data, key = lambda x: (x[0], x[1]))
     gff_out = '%s.gff' %(prefix)
-    writegff(data, te, gff_out)
+    writegff(data, gff_out)
     datac = data
-    datac = update_pos(datac, repseq, tsd)
+    datac = update_pos(datac)
     for pos in datac:
         #print pos[0], pos[1], pos[2]
-        insert_element(pos, repseq, tsd, ref)
+        insert_element(pos, ref)
     fasta_out = '%s.fasta' %(prefix)
     write_fasta(ref, chrs, fasta_out)    
 
@@ -194,7 +219,7 @@ def main():
     ref = fasta_ref(args.genome)
     element  = fasta_te(args.repeat, args.te)
     #print args.te,element[args.te][0], element[args.te][1]
-    simulate(ref, element[args.te][0], element[args.te][1], args.te, args.chr, args.number, args.prefix)
+    simulate(ref, element, args.te, args.chr, args.number, args.prefix)
     if not os.path.exists(args.outdir):
         os.mkdir(args.outdir)
     cmd = 'mv %s.* %s' %(args.prefix, args.outdir)
