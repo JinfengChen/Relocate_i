@@ -107,7 +107,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input')
     parser.add_argument('-r', '--refte')
-    parser.add_argument('-d', '--distance', default='10', type=int)
+    parser.add_argument('-d', '--distance', default='3', type=int)
     parser.add_argument('-o', '--output')
     parser.add_argument('-v', dest='verbose', action='store_true')
     args = parser.parse_args()

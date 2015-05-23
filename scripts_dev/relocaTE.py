@@ -52,7 +52,7 @@ def split_fq(fastq, outdir, fa_flag):
     seqtk = '/rhome/cjinfeng/software/tools/seqtk-master//seqtk'
     fastq_split = 'perl /rhome/cjinfeng/software/bin/fastq_split.pl'
     #do not split if file already exist
-    test_fq = '%s/p00.%s' %(outdir, fastq) 
+    test_fq = '%s/p00.%s' %(outdir, os.path.split(fastq)[1]) 
     if os.path.isfile(test_fq):
         subfqs = glob.glob('%s/*.f*q' %(outdir))
         for subfq in subfqs:
