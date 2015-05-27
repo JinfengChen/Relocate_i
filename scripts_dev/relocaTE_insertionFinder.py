@@ -236,8 +236,8 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
                 print "junction only supported by low quality read, remove"
                 #del teInsertions[event][start]
                 lowquality_flag = 1
-            
-            if fullreads_flag == 0 and lowquality_flag == 0:
+            if (fullreads_flag == 0 and lowquality_flag == 0):
+            #if (fullreads_flag == 0 and lowquality_flag == 0) or (foundTSD != 'UNK' and lowquality_flag == 0):
                 #####information on each start position
                 print "store information on each start position"
                 start_both_junction = start_both_junction + 1 if (int(left_count) > 0 and int(right_count) > 0) else start_both_junction
@@ -1333,7 +1333,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             if r.search(name):
                 #only for junction reads
                 print 'Junction: %s\t%s\t%s\t%s' %(name, chro, start, end)
-                extend = 2
+                extend = 10
                 read_order = 0
                 if record.is_read1:
                     read_order = 1
