@@ -8,6 +8,7 @@ import argparse
 import glob
 import subprocess
 import multiprocessing as mp
+import pysam
 
 def usage():
     test="name"
@@ -21,6 +22,43 @@ Align flanking_fq to genome in unpaired and paired manner
 def createdir(dirname):
     if not os.path.exists(dirname):
         os.mkdir(dirname)
+
+def readtable(infile):
+    data = defaultdict(str)
+    with open (infile, 'r') as filehd:
+        for line in filehd:
+            line = line.rstrip()
+            if len(line) > 2: 
+                unit = re.split(r'\t',line)
+                if not data.has_key(unit[0]):
+                    data[unit[0]] = unit[1]
+    return data
+
+def get_unpaired_info_chr(unpaired_bam, unpaired_info, unpaired_info_chr):
+    info_dict = readtable(unpaired_info)
+    ofile  = open(unpaired_info_chr, 'w')
+    fsam   = pysam.AlignmentFile(unpaired_bam, 'rb')
+    rnames = fsam.references
+    rlens  = fsam.lengths
+    for record in fsam.fetch(reference=None, until_eof = True):
+        if not record.is_unmapped:
+            #query inf
+            qName    = record.query_name
+            qLen     = int(record.query_length)
+            qStart   = int(record.query_alignment_start)
+            qEnd     = int(record.query_alignment_end) - 1
+            #target inf
+            tName    = rnames[record.reference_id]
+            tLen     = int(rlens[record.reference_id])
+            tStart   = int(record.reference_start)
+            tEnd     = int(record.reference_end) - 1 
+            if info_dict.has_key(qName):
+                print >> ofile, '%s\t%s\t%s' %(qName, info_dict[qName], tName)
+        else:
+            qName    = record.query_name
+            if info_dict.has_key(qName):
+                print >> ofile, '%s\t%s\t%s' %(qName, info_dict[qName], 'NA')
+    ofile.close()
 
 def fastq2id(fastq, id_file):
     awk_cmd0 = 'cat %s | ' %(fastq)
@@ -53,6 +91,7 @@ def paired_id(fullread1_id, fullread2_id, fullreadu_id):
     ofile_id1 = open(fullread1_id, 'w')
     ofile_id2 = open(fullread2_id, 'w')
     r_id= re.compile(r'(.*)\:(start|end):\d+')
+    ##for paired-end junction reads, if one read is junction we output paired id/sequence to fullreads1 and fullreads2
     for i in range(len(id1)):
         flag1 = 0
         flag2 = 0
@@ -65,6 +104,7 @@ def paired_id(fullread1_id, fullread2_id, fullreadu_id):
         if flag1 == 1 or flag2 == 1:
             print >> ofile_id1, id1[i]
             print >> ofile_id2, id2[i]
+    #for unpaired junction reads, if read is junction read we output paired-end id/sequence to fullread1 and fullread2
     for i in range(len(idu)):
         if r_id.search(idu[i]):
             idu[i] = r_id.search(idu[i]).groups(0)[0]
@@ -208,6 +248,9 @@ def map_reads_bwa_mp_runner(flanking_fq_list, scripts, path, genome_file, fastq_
         match1 = '%s.matched' %(fastq1)
         match2 = '%s.matched' %(fastq2)
         unpaired = '%s/flanking_seq/%s.unPaired.fq' %(path, fq_name)
+        unpaired_bam      = '%s/bwa_aln/%s.%s.bwa.unPaired.bam' %(path, target, fq_name)
+        unpaired_info     = '%s/flanking_seq/%s.unPaired.info' %(path, fq_name)
+        unpaired_info_chr = '%s/flanking_seq/%s.unPaired.info.chr' %(path, fq_name)
         if int(os.path.getsize(match1)) > 0 and int(os.path.getsize(match2)) > 0:
             #map paired-reads
             bwa_run_paired(path, genome_file, match1, match2, fq_name, target, bwa, samtools)
@@ -215,6 +258,7 @@ def map_reads_bwa_mp_runner(flanking_fq_list, scripts, path, genome_file, fastq_
         if int(os.path.getsize(unpaired) > 0):
             #map unpaired-reads
             bwa_run(path, genome_file, unpaired, fq_name, target, 'unPaired', bwa, samtools)
+            get_unpaired_info_chr(unpaired_bam, unpaired_info, unpaired_info_chr)
             out_files.append('%s/bwa_aln/%s.%s.bwa.unPaired.bam' %(path, target, fq_name))
         #get full reads of junction reads and their pairs
         #map these reads to genome and use perfect mapped reads as control for false junctions
@@ -312,6 +356,22 @@ def map_reads_bwa(scripts, flanking_fq, path, genome_file, fastq_dir, target, bw
         os.system('%s sort %s %s.sorted' %(samtools, merged_bwa_f, os.path.splitext(merged_bwa_f)[0]))
         os.system('%s index %s.sorted.bam' %(samtools, os.path.splitext(merged_bwa_f)[0]))
 
+    ##merge info_chr file and split into chr based files
+    info_chr_fh    = {}
+    info_chr_files = glob.glob('%s/flanking_seq/*.unPaired.info.chr' %(path))
+    for info_chr_file in info_chr_files:
+        with open (info_chr_file, 'r') as filehd:
+            for line in filehd:
+                line = line.rstrip()
+                if len(line) > 2: 
+                    unit = re.split(r'\t',line)
+                    if not info_chr_fh.has_key(unit[2]):
+                        info_chr_fh[unit[2]] = open('%s/flanking_seq/%s.flankingReads.unPaired.info' %(path, unit[2]), 'w')
+                        print >> info_chr_fh[unit[2]], line
+                    else:
+                        print >> info_chr_fh[unit[2]], line
+    for temp_chr in info_chr_fh:
+        info_chr_fh[temp_chr].close()
 
 def bowtie_run(path, genome_file, fastq, fq_name, target, bowtie2, relax_align, bowtie_sam, readclass):
     if bowtie2 != 1 and bowtie_sam and relax_align != 1:

@@ -212,7 +212,7 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
             #filter out junctions that fullreads are properly mapped on reference
             left_f, right_f, left_t, right_t = junction_full_reads(left_jun_reads, right_jun_reads, teFullReads)
             print 'fullreads left/right, total reads left/right: %s\t%s\t%s\t%s' %(left_f, right_f, left_t, right_t)
-            if float(left_f) >= 0.5 * float(left_t) and float(right_f) >= 0.5 * float(right_t):
+            if float(left_f) >= 0.3 * float(left_t) and float(right_f) >= 0.3 * float(right_t):
                 ##junction with reads that properly mapped to reference, should be removed
                 #del teInsertions[event][start]
                 print 'fullreads remove'
@@ -1302,7 +1302,7 @@ def TSD_check_cluster(event, seq, chro, start, end, real_name, read_repeat, name
             print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
 
 
-def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads, teFullReads, mm_allow):
+def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads, teFullReads, teReadsInfo, mm_allow):
     r = re.compile(r'(.*):(start|end):(5|3)')
     r_tsd = re.compile(r'UNK|UKN|unknown', re.IGNORECASE)
     r_cg1 = re.compile(r'[S]')
@@ -1331,29 +1331,127 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             #print 'find_insertion_bam: %s\t%s' %(name, start)
             #filter false junctions
             if r.search(name):
+                #only for junction reads
+                print 'Junction: %s\t%s\t%s\t%s' %(name, chro, start, end)
+                extend = 2
                 read_order = 0
                 if record.is_read1:
                     read_order = 1
                 elif record.is_read2:
                     read_order = 2
                 jun_read_name = r.search(name).groups(0)[0]
-                #print '%s\t%s\t%s' %(name, jun_read_name, read_order)
                 if jun_read_name[-2:] == '/1':
-                    if teJunctionReads[jun_read_name[:-2]][1] == 1:
+                    #read has label for read1, we use label for both paired or unpaired reads
+                    #if teJunctionReads[jun_read_name[:-2]][1] == 1:
+                    ##we assume that the fullread and junction reads mapped to the same position on chromosome, if not we will do nothing
+                    if teJunctionReads[jun_read_name[:-2]][1][3] == 1:
+                        #fullread mapped properly to genome
                         teFullReads[name] = 1
-                        #continue
+                    elif teJunctionReads[jun_read_name[:-2]][1][0] == chro and int(teJunctionReads[jun_read_name[:-2]][1][1]) == start:
+                        #fullread overlap with junction read
+                        if int(teJunctionReads[jun_read_name[:-2]][1][2]) >= end + extend:
+                            #fullread extend more than 5 bp into insertion, suggesting no insertion
+                            teFullReads[name] = 1
+                    elif teJunctionReads[jun_read_name[:-2]][1][0] == chro and int(teJunctionReads[jun_read_name[:-2]][1][2]) == end:
+                        if int(teJunctionReads[jun_read_name[:-2]][1][1]) <= start - extend:
+                            teFullReads[name] = 1
+                    #elif not teJunctionReads[jun_read_name[:-2]][1][0] == 0:
+                        #fullread mapped to genome but not in the same position with junction reads or shift of position on chromosome
+                        #we remove these junction read as fullreads too
+                    #    teFullReads[name] = 1
                 elif jun_read_name[-2:] == '/2':
-                    if teJunctionReads[jun_read_name[:-2]][2] == 1:
+                    #read has label for read2, we use label for both paired or unpaired reads
+                    #if teJunctionReads[jun_read_name[:-2]][2] == 1:
+                    #    teFullReads[name] = 1
+                    if teJunctionReads[jun_read_name[:-2]][2][3] == 1:
                         teFullReads[name] = 1
-                        #continue
+                    elif teJunctionReads[jun_read_name[:-2]][2][0] == chro and int(teJunctionReads[jun_read_name[:-2]][2][1]) == start:
+                        #fullread overlap with junction read
+                        if int(teJunctionReads[jun_read_name[:-2]][2][2]) >= end + extend:
+                            #fullread extend more than 5 bp into insertion, suggesting no insertion
+                            teFullReads[name] = 1
+                    elif teJunctionReads[jun_read_name[:-2]][2][0] == chro and int(teJunctionReads[jun_read_name[:-2]][2][2]) == end:
+                        if int(teJunctionReads[jun_read_name[:-2]][2][1]) <= start - extend:
+                            teFullReads[name] = 1
+                    #elif not teJunctionReads[jun_read_name[:-2]][2][0] == 0:
+                    #    teFullReads[name] = 1
+                elif read_order == 1 or read_order == 2:
+                    #read do not have label, read is paired and read is read1
+                    #if teJunctionReads[jun_read_name][1] == 1:
+                        #fullread mapped to genome
+                    #    teFullReads[name] = 1
+                    if teJunctionReads[jun_read_name][read_order][3] == 1:
+                        teFullReads[name] = 1
+                    elif teJunctionReads[jun_read_name][read_order][0] == chro and int(teJunctionReads[jun_read_name][read_order][1]) == start:
+                        #fullread overlap with junction read
+                        if int(teJunctionReads[jun_read_name][read_order][2]) >= end + extend:
+                            #fullread extend more than 5 bp into insertion, suggesting no insertion
+                            teFullReads[name] = 1
+                    elif teJunctionReads[jun_read_name][read_order][0] == chro and int(teJunctionReads[jun_read_name][read_order][2]) == end:
+                        if int(teJunctionReads[jun_read_name][read_order][1]) <= start - extend:
+                            teFullReads[name] = 1
+                    #elif not teJunctionReads[jun_read_name][read_order][0] == 0:
+                    #    teFullReads[name] = 1
+                #elif read_order == 2:
+                    #read do not have label, read is paired and read is read2
+                #    if teJunctionReads[jun_read_name][2] == 1:
+                        #fullread mapped to genome
+                #        teFullReads[name] = 1
                 else:
-                    if teJunctionReads[jun_read_name][1] == 1 and teJunctionReads[jun_read_name][2] == 1:
+                    #read do not have label, read is unpaired, need to use unPaired_read_info
+                    if teReadsInfo.has_key(name):
+                        if teReadsInfo[name] == 1:
+                            #read1
+                            #if teJunctionReads[jun_read_name][1] == 1:
+                            #    teFullReads[name] = 1
+                            if teJunctionReads[jun_read_name][1][3] == 1:
+                                teFullReads[name] = 1
+                            elif teJunctionReads[jun_read_name][1][0] == chro and int(teJunctionReads[jun_read_name][1][1]) == start:
+                                #fullread overlap with junction read
+                                if int(teJunctionReads[jun_read_name][1][2]) >= end + extend:
+                                    #fullread extend more than 5 bp into insertion, suggesting no insertion
+                                    teFullReads[name] = 1
+                            elif teJunctionReads[jun_read_name][1][0] == chro and int(teJunctionReads[jun_read_name][1][2]) == end:
+                                if int(teJunctionReads[jun_read_name][1][1]) <= start - extend:
+                                    teFullReads[name] = 1
+                            #elif not teJunctionReads[jun_read_name][1][0] == 0:
+                            #    teFullReads[name] = 1
+                        elif teReadsInfo[name] == 2:
+                            #read2
+                            #if teJunctionReads[jun_read_name][2] == 1:
+                            #    teFullReads[name] = 1
+                            if teJunctionReads[jun_read_name][2][3] == 1:
+                                teFullReads[name] = 1
+                            elif teJunctionReads[jun_read_name][2][0] == chro and int(teJunctionReads[jun_read_name][2][1]) == start:
+                                #fullread overlap with junction read
+                                if int(teJunctionReads[jun_read_name][2][2]) >= end + extend:
+                                    #fullread extend more than 5 bp into insertion, suggesting no insertion
+                                    teFullReads[name] = 1
+                            elif teJunctionReads[jun_read_name][2][0] == chro and int(teJunctionReads[jun_read_name][2][2]) == end:
+                                if int(teJunctionReads[jun_read_name][2][1]) <= start - extend:
+                                    teFullReads[name] = 1
+                            #elif not teJunctionReads[jun_read_name][2][0] == 0:
+                            #    teFullReads[name] = 1
+                    else:
+                        print 'teReadsInfo do not have key of %s' %(name)
+                    
+                #print '%s\t%s\t%s' %(name, jun_read_name, read_order)
+                #if jun_read_name[-2:] == '/1':
+                #    if teJunctionReads[jun_read_name[:-2]][1] == 1:
+                #        teFullReads[name] = 1
+                        #continue
+                #elif jun_read_name[-2:] == '/2':
+                #    if teJunctionReads[jun_read_name[:-2]][2] == 1:
+                #        teFullReads[name] = 1
+                        #continue
+                #else:
+                    #if teJunctionReads[jun_read_name][1] == 1 and teJunctionReads[jun_read_name][2] == 1:
                         #both reads are perfect matched
                         #in case the read is not paired because the pairs is in repeat
-                        teFullReads[name] = 1
+                    #    teFullReads[name] = 1
                         #continue
-                    elif teJunctionReads[jun_read_name][read_order] == 1:
-                        teFullReads[name] = 1
+                    #elif teJunctionReads[jun_read_name][read_order] == 1:
+                    #    teFullReads[name] = 1
                         #continue
 
             strand = ''
@@ -1520,7 +1618,10 @@ def read_junction_reads_align(align_file_f, teJunctionReads):
             seq    = record.query_sequence
             tag    = record.tags if record.tags else []
             chro   = rnames[record.reference_id]
+            start  = int(record.reference_start) + 1
+            end    = int(record.reference_end) + 1
             match  = 0
+            tags   = convert_tag(tag)
             #print '%s\t%s\t%s' %(name, read_order, tag)
             for (key, length) in record.cigartuples:
                 #print key, length
@@ -1531,11 +1632,29 @@ def read_junction_reads_align(align_file_f, teJunctionReads):
                     match += length
             #if int(MAPQ) >= 29 and match >= len(seq) - 10:
             #    print '%s' %(name)
+            intact_flag = 0
             if match >= len(seq) - 10:
-                teJunctionReads[name][read_order] = 1
+                #teJunctionReads[name][read_order] = 1
+                intact_flag = 1
+          
+            ##quality control of fullreads alignment
+            #xm = int(tags['XM']) if tags.has_key('XM') else 0
+            #if xm <= 3:
+            teJunctionReads[name][read_order] = [chro, start, end, intact_flag]
+            print 'TE_junction_reads: %s\t%s\t%s\t%s' %(name, chro, start, end)
+            #else:
+            #    teJunctionReads[name][read_order] = [0, 0, 0, 0]
         else:
             name   = record.query_name
-            teJunctionReads[name][read_order] = 0
+            teJunctionReads[name][read_order] = [0, 0, 0, 0]
+
+def read_unpaired_read_info(unpaired_read_info, teReadsInfo):
+    with open (unpaired_read_info, 'r') as filehd:
+        for line in filehd:
+            line = line.rstrip()
+            if len(line) > 2: 
+                unit = re.split(r'\t',line)
+                teReadsInfo[unit[0]] = int(unit[1])
 
 def parse_regex(infile):
     data = []
@@ -1584,7 +1703,8 @@ def main():
     teSupportingReads    = defaultdict(lambda : list())
     teLowQualityReads    = defaultdict(lambda : list())
     teFullReads          = defaultdict(lambda : int())
-    teJunctionReads      = defaultdict(lambda : defaultdict(lambda : int()))
+    teJunctionReads      = defaultdict(lambda : defaultdict(lambda : list()))
+    teReadsInfo          = defaultdict(lambda : int())
 
     top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
     #read existing TE from file
@@ -1637,10 +1757,14 @@ def main():
     #*.repeat.bwa.sorted.bam
     align_file_f = re.sub(r'.bwa.sorted.bam', r'.fullreads.bwa.sorted.bam', align_file)
     read_junction_reads_align(align_file_f, teJunctionReads)
+    
+    #read and store unpaired junction read information: read1 or read2
+    unpaired_read_info = '%s/flanking_seq/%s.flankingReads.unPaired.info' %('/'.join(top_dir), usr_target)
+    read_unpaired_read_info(unpaired_read_info, teReadsInfo) 
 
     ##cluster reads around insertions
     #find_insertion_cluster_sam(sorted_align, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found)
-    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads, teFullReads, mm_allow)
+    find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads, teFullReads, teReadsInfo, mm_allow)
 
 
     ##output insertions
