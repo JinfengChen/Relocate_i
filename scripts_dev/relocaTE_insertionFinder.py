@@ -603,16 +603,23 @@ def TSD_from_read_depth(r, read_repeat, teReadClusters, teReadClusters_count, te
             pairs_tsd = defaultdict(lambda : int())
             ##find pairs for one insertions
             print 'find pairs for one insertions'
-            for start1 in left_reads.keys():
-                min_dist = 0
+            for start1 in sorted(left_reads.keys(), key=int):
+                min_dist = -100
                 min_pair = ''
-                for start2 in right_reads.keys():
-                    if min_dist == 0: 
+                for start2 in sorted(right_reads.keys(), key=int):
+                    if min_dist < 0:
                         min_dist = abs(int(start2) - int(start1))
                         min_pair = start2
                     elif min_dist > abs(int(start2) - int(start1)):
-                        min_dist = abs(int(start2) - int(start1))
-                        min_pair = start2
+                        if min_dist <= 100 and int(start2) < int(start1):
+                            ##likely start1 and start2 overlap (find TSD), we choose one with more sequence depth
+                            if len(right_reads[start2]) > len(right_reads[min_pair]):
+                                min_dist = abs(int(start2) - int(start1))
+                                min_pair = start2
+                        else:
+                            ##may not TSD
+                            min_dist = abs(int(start2) - int(start1))
+                            min_pair = start2
                 if min_dist <= 100:
                     ##find pairs
                     print 'find pairs'

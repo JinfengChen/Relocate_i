@@ -58,6 +58,7 @@ def Overlap_TE_boundary(prefix, refte, distance):
     final_gff   = '%s.gff' %(prefix)
     raw_gff     = '%s.raw.gff' %(prefix)
     all_gff     = '%s.all.gff' %(prefix)
+    high_gff    = '%s.high_conf.gff' %(prefix)
     clean_gff   = '%s.clean.gff' %(prefix)
     infile = '%s.overlap' %(prefix)
     outfile= '%s.remove.gff' %(prefix)
@@ -95,12 +96,14 @@ def Overlap_TE_boundary(prefix, refte, distance):
         os.system('mv %s %s' %(final_gff, raw_gff))
         os.system('cp %s %s' %(raw_gff, all_gff))
         os.system('grep -v \"singleton\|insufficient_data\|supporting_reads\" %s > %s' %(raw_gff, final_gff))
+        os.system('grep -v -e \"Right_junction_reads:1;Left_junction_reads:0\" -e \"Right_junction_reads:0;Left_junction_reads:1\" %s > %s' %(final_gff, high_gff)) 
         os.system('rm %s.overlap %s.remove.gff' %(prefix, prefix))
     else:
         os.system('/opt/bedtools/2.17.0-25-g7b42b3b/bin/bedtools intersect -v -a %s -b %s > %s' %(final_gff, outfile, clean_gff))
         os.system('mv %s %s' %(final_gff, raw_gff))
         os.system('cp %s %s' %(clean_gff, all_gff))
         os.system('grep -v \"singleton\|insufficient_data\|supporting_reads\" %s > %s' %(clean_gff, final_gff))
+        os.system('grep -v -e \"Right_junction_reads:1;Left_junction_reads:0\" -e \"Right_junction_reads:0;Left_junction_reads:1\" %s > %s' %(final_gff, high_gff))
         os.system('rm %s.overlap %s.remove.gff %s.clean.gff' %(prefix, prefix, prefix))
 
 def main():
