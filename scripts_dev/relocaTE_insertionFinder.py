@@ -1060,7 +1060,7 @@ def TSD_check_single(event, seq, chro, start, end, real_name, read_repeat, name,
     r3 = re.compile(r'end:[53]$')
     #r5_tsd = re.compile(r'^(%s)' %(TSD))
     #r3_tsd = re.compile(r'(%s)$' %(TSD))
-    print 'TSD_check_single\t%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    if verbose > 2: print 'TSD_check_single\t%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     ##start means that the TE was removed from the start of the read
     ##5 means the trimmed end mapps to the 5prime end of the TE
     ##3 means the trimmed end mapps to the 3prime end of the TE
@@ -1092,27 +1092,27 @@ def TSD_check_single(event, seq, chro, start, end, real_name, read_repeat, name,
             pos       = 'right'
             TE_orient = '-' if name[-1] == '5' else '+'
             TSD_start = int(start)
-    print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    if verbose > 2: print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
         #if 0:
         #    continue
         if pos == 'left':
             tir1_end = int(TSD_start)
-            print 'tir1: %s' %(tir1_end)
+            if verbose > 2: print 'tir1: %s' %(tir1_end)
         elif pos == 'right':
             tir2_end = int(TSD_start) - 1
-            print 'tir2: %s' %(tir2_end)
+            if verbose > 2: print 'tir2: %s' %(tir2_end)
         if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
             te_id = existingTE_inf[chro]['start'][tir1_end]
         #    existingTE_found[te_id]['start'] += 1
-            print 'tir1'
+            if verbose > 2: print 'tir1'
         elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
             te_id = existingTE_inf[chro]['end'][tir2_end]
         #    existingTE_found[te_id]['end'] += 1
-            print 'tir2'
+            if verbose > 2: print 'tir2'
         else:
-            print 'not match'
+            if verbose > 2: print 'not match'
             ##non reference insertions
             if teLowQualityReads.has_key(name):
                 teInsertions[event][TSD_start][TSD_seq]['count_low']     += 1
@@ -1130,7 +1130,7 @@ def TSD_check_single(event, seq, chro, start, end, real_name, read_repeat, name,
 
             teInsertions_reads[event][TSD_start][TSD_seq]['read'].append(name)
             #print '1: %s\t 2: %s' %(read_name, teInsertions_reads[event][TSD_seq][TSD_start]['read'])
-            print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
+            if verbose > 2: print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
 
 def TSD_check(event, seq, chro, start, end, real_name, read_repeat, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found):
     ##TSD already specified by usr, not unknown
@@ -1147,7 +1147,7 @@ def TSD_check(event, seq, chro, start, end, real_name, read_repeat, name, TSD, s
     r3 = re.compile(r'end:[53]$')
     r5_tsd = re.compile(r'^(%s)' %(TSD))
     r3_tsd = re.compile(r'(%s)$' %(TSD))
-    print 'TSD_check\t%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    if verbose > 2: print 'TSD_check\t%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     ##start means that the TE was removed from the start of the read
     ##5 means the trimmed end mapps to the 5prime end of the TE
     ##3 means the trimmed end mapps to the 3prime end of the TE
@@ -1179,7 +1179,7 @@ def TSD_check(event, seq, chro, start, end, real_name, read_repeat, name, TSD, s
             pos       = 'right'
             TE_orient = '-' if name[-1] == '5' else '+'
             TSD_start = int(start)
-    print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    if verbose > 2: print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
         if 0:
@@ -1187,18 +1187,18 @@ def TSD_check(event, seq, chro, start, end, real_name, read_repeat, name, TSD, s
         if pos == 'left':
             #tir1_end = int(start) + len(seq)
             tir1_end = int(end)
-            print 'tir1: %s' %(tir1_end)
+            if verbose > 2: print 'tir1: %s' %(tir1_end)
         elif pos == 'right':
             tir2_end = int(start) - 1
-            print 'tir2: %s' %(tir2_end)
+            if verbose > 2: print 'tir2: %s' %(tir2_end)
         if tir1_end > 0 and existingTE_inf[chro]['start'].has_key(tir1_end):
             te_id = existingTE_inf[chro]['start'][tir1_end]
         #    #existingTE_found[te_id]['start'] += 1
-            print 'tir1'
+            if verbose > 2: print 'tir1'
         elif tir2_end > 0 and existingTE_inf[chro]['end'].has_key(tir2_end):
             te_id = existingTE_inf[chro]['end'][tir2_end]
         #    #existingTE_found[te_id]['end'] += 1
-            print 'tir2'
+            if verbose > 2: print 'tir2'
         else:
             #print 'not match'
             ##non reference insertions
@@ -1208,7 +1208,7 @@ def TSD_check(event, seq, chro, start, end, real_name, read_repeat, name, TSD, s
             #read_name = re.sub(r':start|:end', '', name)
             teInsertions_reads[event][TSD_start][TSD_seq]['read'].append(name)
             #print '1: %s\t 2: %s' %(read_name, teInsertions_reads[event][TSD_seq][TSD_start]['read'])
-            print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
+            if verbose > 2: print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
 
 def convert_tag(tag):
     tags = {}
@@ -1231,7 +1231,7 @@ def TSD_check_cluster(event, seq, chro, start, end, real_name, read_repeat, name
     r3 = re.compile(r'end:[53]$')
     r5_tsd = re.compile(r'^(%s)' %(TSD))
     r3_tsd = re.compile(r'(%s)$' %(TSD))
-    print 'TSD_check\t%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    if verbose > 2: print 'TSD_check\t%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     ##start means that the TE was removed from the start of the read
     ##5 means the trimmed end mapps to the 5prime end of the TE
     ##3 means the trimmed end mapps to the 3prime end of the TE
@@ -1263,7 +1263,7 @@ def TSD_check_cluster(event, seq, chro, start, end, real_name, read_repeat, name
             pos       = 'right'
             TE_orient = '-' if name[-1] == '5' else '+'
             TSD_start = int(start)
-    print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
+    if verbose > 2: print '%s\t%s\t%s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient, pos, repeat)
     if result and TE_orient:
         tir1_end, tir2_end = [0, 0]
         if 0: # do not filter exiting TE when insertion have both junction support
@@ -1299,7 +1299,7 @@ def TSD_check_cluster(event, seq, chro, start, end, real_name, read_repeat, name
                 teInsertions_reads[event][TSD_start][TSD_seq]['right_read'].append(name)
             teInsertions_reads[event][TSD_start][TSD_seq]['read'].append(name)
             #print '1: %s\t 2: %s' %(read_name, teInsertions_reads[event][TSD_seq][TSD_start]['read'])
-            print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
+            if verbose > 2: print 'C: %s\t%s\t%s\t%s\t%s' %(event, name, TSD_seq, TSD_start, TE_orient)
 
 
 def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads, teFullReads, teReadsInfo, mm_allow):
@@ -1332,7 +1332,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             #filter false junctions
             if r.search(name):
                 #only for junction reads
-                print 'Junction: %s\t%s\t%s\t%s' %(name, chro, start, end)
+                if verbose > 2: print 'Junction: %s\t%s\t%s\t%s' %(name, chro, start, end)
                 extend = 10
                 read_order = 0
                 if record.is_read1:
@@ -1467,7 +1467,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             if r_cg2.search(cigar): 
                 cg_flag = 1
             tags = convert_tag(tag)
-            print '%s\t%s\t%s\t%s' %(name, start, MAPQ, tag)
+            if verbose > 2: print '%s\t%s\t%s\t%s' %(name, start, MAPQ, tag)
             # filter low quality mapping reads: 
             # 1. paired-end reads at least have one reads unique mapped (MAPQ set to 0 for both reads if both are repeat, else should be > 0 at least one unique mapped)
             # 2. unpaired reads should unique mapped, no gap, mismatch <= 3 and no suboptimal alignment
@@ -1475,7 +1475,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             #if record.is_proper_pair and (int(MAPQ) >= 29 or tags['XT'] == 'U'):
             #if record.is_proper_pair and int(MAPQ) > 0:
             if record.is_proper_pair:
-                print 'is proper paired'
+                if verbose > 2: print 'is proper paired'
                 #store low quality read in dict
                 if int(MAPQ) < 29:
                     x1 = int(tags['X1']) if tags.has_key('X1') else 0
@@ -1491,10 +1491,10 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             #elif not record.is_paired:
             else:
-                print 'is not paired or not proper paired'
+                if verbose > 2: print 'is not paired or not proper paired'
                 #store low quality read in dict, not properly paired is low quality
                 if int(MAPQ) < 29 or record.is_paired:
-                    print 'low quality reads'
+                    if verbose > 2: print 'low quality reads'
                     x1 = int(tags['X1']) if tags.has_key('X1') else 0
                     xm = int(tags['XM']) if tags.has_key('XM') else 0
                     xo = int(tags['XO']) if tags.has_key('XO') else 0
@@ -1504,11 +1504,11 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                 #if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['X1']) <= 3:
                 if r.search(name): #junction reads, allowed only 1 mismatch
                     if tags['XT'] == 'U' and int(tags['XM']) <= int(mm_allow) and int(tags['X1']) <= 3:
-                        print 'junction pass'
+                        if verbose > 2: print 'junction pass'
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
                 else:
                     if tags['XT'] == 'U' and int(tags['XM']) <= int(mm_allow) and int(tags['X1']) <= 3:
-                        print 'supporting pass'
+                        if verbose > 2: print 'supporting pass'
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             teReadClusters[count]['read_inf']['seq']['chr'] = chro
             #print 'after: %s\t%s\t%s' %(name, count, bin_ins)
@@ -1641,7 +1641,7 @@ def read_junction_reads_align(align_file_f, teJunctionReads):
             #xm = int(tags['XM']) if tags.has_key('XM') else 0
             #if xm <= 3:
             teJunctionReads[name][read_order] = [chro, start, end, intact_flag]
-            print 'TE_junction_reads: %s\t%s\t%s\t%s' %(name, chro, start, end)
+            #print 'TE_junction_reads: %s\t%s\t%s\t%s' %(name, chro, start, end)
             #else:
             #    teJunctionReads[name][read_order] = [0, 0, 0, 0]
         else:
@@ -1671,10 +1671,11 @@ def parse_regex(infile):
 
 
 def main():
-    if not len(sys.argv) == 12:
+    if not len(sys.argv) == 13:
         usage()
         exit(2)
 
+    global verbose
     required_reads       = 1           ## rightReads + leftReads needs to be > to this value
     required_left_reads  = 1           ## needs to be >= to this value
     required_right_reads = 1           ## needs to be >= to this value
@@ -1689,6 +1690,7 @@ def main():
     mm_allow             = sys.argv[9] ## mismatches allowed: 0, 1, 2, 3
     bowtie2              = sys.argv[10] ## use bowtie2 or not: 1 or 0
     lib_size             = sys.argv[11] ## insert size of library
+    verbose              = int(sys.argv[12])
     #relax_reference      = sys.argv[11]## relax mode for existing TE: 1 or 0
     #relax_align          = sys.argv[12]## relax mode for insertion: 1 or 0
     bowtie_sam           = 1           ## change to shift or remove in V2
