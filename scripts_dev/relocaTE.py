@@ -229,7 +229,7 @@ def main():
     parser.add_argument('--step', default='1234567', type=str)
     parser.add_argument('--run', help='run while this script excute', action='store_true')
     parser.add_argument('--split', help='split fastq into 1 M chunks to run blat/bwa jobs', action='store_true')
-    parser.add_argument('-v', dest='verbose', default='1', type=int, help='verbose grade to print out information in all scripts: range from 0..4')
+    parser.add_argument('-v', '--verbose', dest='verbose', default='1', type=int, help='verbose grade to print out information in all scripts: range from 0..4')
     args = parser.parse_args()
     
     try:
@@ -624,11 +624,14 @@ def main():
         print 'Existing TE file does not exists or zero size'
  
     #step5 find insertions
+    print 'Step5: Find non-reference insertions'
     shells_step5 = []
     ids = fasta_id(reference)
     createdir('%s/shellscripts/step_5' %(args.outdir))
     step5_count = 0
+    ids = ['chr1']
     for chrs in ids:
+        print 'find insertions on %s' %(chrs)
         step5_cmd = 'python %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s %s 0 %s %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.mismatch_junction, args.size, args.verbose)
         step5_file= '%s/shellscripts/step_5/%s.repeat.findSites.sh' %(args.outdir, step5_count)
         if '5' in list(args.step):
@@ -646,6 +649,7 @@ def main():
 
 
     #step6 find transposons on reference: reference only or shared
+    print 'Step5: Find reference insertions'
     shells_step6 = []
     createdir('%s/shellscripts/step_6' %(args.outdir))
     step6_count = 0

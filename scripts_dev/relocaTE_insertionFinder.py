@@ -1335,7 +1335,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             #end    = int(start) + int(length) - 1 #should not allowed for indel or softclip
             end    = int(record.reference_end) + 1
             #print 'end compare %s: %s, %s' %(name, end)
-            #print 'find_insertion_bam: %s\t%s' %(name, start)
+            if verbose > 2: print 'find_insertion_bam: %s\t%s' %(name, start)
             #filter false junctions
             if r.search(name):
                 #only for junction reads
@@ -1348,6 +1348,8 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                     read_order = 2
                 jun_read_name = r.search(name).groups(0)[0]
                 if jun_read_name[-2:] == '/1':
+                    if not teJunctionReads.has_key(jun_read_name[:-2]):
+                        continue
                     #read has label for read1, we use label for both paired or unpaired reads
                     #if teJunctionReads[jun_read_name[:-2]][1] == 1:
                     ##we assume that the fullread and junction reads mapped to the same position on chromosome, if not we will do nothing
@@ -1367,6 +1369,8 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                         #we remove these junction read as fullreads too
                     #    teFullReads[name] = 1
                 elif jun_read_name[-2:] == '/2':
+                    if not teJunctionReads.has_key(jun_read_name[:-2]):
+                        continue
                     #read has label for read2, we use label for both paired or unpaired reads
                     #if teJunctionReads[jun_read_name[:-2]][2] == 1:
                     #    teFullReads[name] = 1
@@ -1383,6 +1387,8 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                     #elif not teJunctionReads[jun_read_name[:-2]][2][0] == 0:
                     #    teFullReads[name] = 1
                 elif read_order == 1 or read_order == 2:
+                    if not teJunctionReads.has_key(jun_read_name):
+                        continue
                     #read do not have label, read is paired and read is read1
                     #if teJunctionReads[jun_read_name][1] == 1:
                         #fullread mapped to genome
@@ -1408,6 +1414,8 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                     #read do not have label, read is unpaired, need to use unPaired_read_info
                     if teReadsInfo.has_key(name):
                         if teReadsInfo[name] == 1:
+                            if not teJunctionReads.has_key(jun_read_name):
+                                continue
                             #read1
                             #if teJunctionReads[jun_read_name][1] == 1:
                             #    teFullReads[name] = 1
@@ -1424,6 +1432,8 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                             #elif not teJunctionReads[jun_read_name][1][0] == 0:
                             #    teFullReads[name] = 1
                         elif teReadsInfo[name] == 2:
+                            if not teJunctionReads.has_key(jun_read_name):
+                                continue
                             #read2
                             #if teJunctionReads[jun_read_name][2] == 1:
                             #    teFullReads[name] = 1
@@ -1606,12 +1616,14 @@ def createdir(dirname):
     if not os.path.exists(dirname):
         os.mkdir(dirname)
 
-def read_junction_reads_align(align_file_f, teJunctionReads):
+def read_junction_reads_align(align_file_f, read_repeat, teJunctionReads):
     target = 'ALL'
     ref  = None if target == 'ALL' else target
     fsam = pysam.AlignmentFile(align_file_f, 'rb')
     rnames = fsam.references
     for record in fsam.fetch(reference=ref, until_eof = True):
+        if record.query_sequence is None:
+            continue
         read_order = 0
         if record.is_read1:
             read_order = 1
@@ -1629,7 +1641,7 @@ def read_junction_reads_align(align_file_f, teJunctionReads):
             end    = int(record.reference_end) + 1
             match  = 0
             tags   = convert_tag(tag)
-            #print '%s\t%s\t%s' %(name, read_order, tag)
+            #print 'read junction align: %s\t%s\t%s\t%s' %(name, read_order, seq, tag)
             for (key, length) in record.cigartuples:
                 #print key, length
                 if int(key) == 0:
@@ -1647,13 +1659,21 @@ def read_junction_reads_align(align_file_f, teJunctionReads):
             ##quality control of fullreads alignment
             #xm = int(tags['XM']) if tags.has_key('XM') else 0
             #if xm <= 3:
-            teJunctionReads[name][read_order] = [chro, start, end, intact_flag]
+            read_name0 = name
+            read_name1 = '%s/1' %(name)
+            read_name2 = '%s/2' %(name)
+            if read_repeat.has_key(read_name0) or read_repeat.has_key(read_name1) or read_repeat.has_key(read_name2):
+                teJunctionReads[name][read_order] = [chro, start, end, intact_flag]
             #print 'TE_junction_reads: %s\t%s\t%s\t%s' %(name, chro, start, end)
             #else:
             #    teJunctionReads[name][read_order] = [0, 0, 0, 0]
         else:
             name   = record.query_name
-            teJunctionReads[name][read_order] = [0, 0, 0, 0]
+            read_name0 = name
+            read_name1 = '%s/1' %(name)
+            read_name2 = '%s/2' %(name)
+            if read_repeat.has_key(read_name0) or read_repeat.has_key(read_name1) or read_repeat.has_key(read_name2):
+                teJunctionReads[name][read_order] = [0, 0, 0, 0]
 
 def read_unpaired_read_info(unpaired_read_info, teReadsInfo):
     with open (unpaired_read_info, 'r') as filehd:
@@ -1758,15 +1778,22 @@ def main():
     ##read -> repeat relation
     #top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
     result  = '%s/results' %('/'.join(top_dir))
-    read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
+    read_repeat_files = []
+    if usr_target == 'ALL':
+        read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.split.txt' %('/'.join(top_dir)))
+    else:
+        read_repeat_files = glob.glob('%s/te_containing_fq/%s.read_repeat_name.split.txt' %('/'.join(top_dir), usr_target))
+    #read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
     read_repeat = read_repeat_name(read_repeat_files)
 
     #read and store full length reads alignment on genome
     #*.repeat.fullreads.bwa.sorted.bam
     #*.repeat.bwa.sorted.bam
     align_file_f = re.sub(r'.bwa.sorted.bam', r'.fullreads.bwa.sorted.bam', align_file)
-    read_junction_reads_align(align_file_f, teJunctionReads)
-    
+    print 'fullread bam: %s' %(align_file_f)
+    read_junction_reads_align(align_file_f, read_repeat, teJunctionReads)
+    print 'junction fullread number: %s' %(len(teJunctionReads.keys()))   
+ 
     #read and store unpaired junction read information: read1 or read2
     unpaired_read_info = '%s/flanking_seq/%s.flankingReads.unPaired.info' %('/'.join(top_dir), usr_target)
     read_unpaired_read_info(unpaired_read_info, teReadsInfo) 

@@ -41,6 +41,63 @@ def readtable(infile):
                     data[unit[0]] = unit[1]
     return data
 
+def write_repeat_name_chr(read_chr_info, repeat_name, repeat_name_chr, read_order):
+    read_order_pair = 1 if int(read_order) == 2 else 2
+    ofile = open(repeat_name_chr, 'w')
+    with open (repeat_name, 'r') as filehd: 
+        for line in filehd:
+            line = line.rstrip()
+            if len(line) > 2:
+                unit = re.split(r'\t',line)
+                
+                read_name = unit[0]
+                if read_name[-2:] == '/1' or read_name[-2:] == '/2': read_name = read_name[:-2]
+                if read_chr_info.has_key(read_name):
+                    if read_chr_info[read_name].has_key(int(read_order)):
+                        #by default set repeat to itself
+                        print >> ofile, '%s\t%s\t%s\t%s' %(unit[0], unit[1], unit[2], read_chr_info[read_name][int(read_order)])
+                    elif read_chr_info[read_name].has_key(int(read_order_pair)):
+                        #if self is not aligned, set to pair
+                        print >> ofile, '%s\t%s\t%s\t%s' %(unit[0], unit[1], unit[2], read_chr_info[read_name][int(read_order_pair)])
+                    elif read_chr_info[read_name].has_key(0):
+                        #set to unpaired
+                        print >> ofile, '%s\t%s\t%s\t%s' %(unit[0], unit[1], unit[2], read_chr_info[read_name][0])
+                    else:
+                        #should not happend, or very rare.
+                        print >> ofile, '%s\t%s\t%s\t%s' %(unit[0], unit[1], unit[2], 'NA')
+                else:
+                    #not in alignment, not usefull at all
+                    #print >> ofile, '%s\t%s\t%s\t%s' %(unit[0], unit[1], unit[2], 'NA')
+                    pass
+    ofile.close()
+
+##read->read_order->chr
+def get_read_chr(bam_file):
+    read_chr = defaultdict(lambda : defaultdict(lambda : str()))
+    r = re.compile(r'(.*):(start|end):(5|3)')
+    fsam   = pysam.AlignmentFile(bam_file, 'rb')
+    rnames = fsam.references
+    rlens  = fsam.lengths
+    for record in fsam.fetch(reference=None, until_eof = True):
+        read_order = 0
+        if record.is_read1:
+            read_order = 1
+        elif record.is_read2:
+            read_order = 2
+        qName    = record.query_name
+        if r.search(qName): qName = r.search(qName).groups(0)[0]
+        if qName[-2:] == '/1' or qName[-2:] == '/2': qName = qName[:-2]
+        if not record.is_unmapped:
+            #query inf
+            #qName    = record.query_name
+            #target inf
+            tName    = rnames[record.reference_id]
+            read_chr[qName][read_order] = tName
+        else:
+            #qName    = record.query_name
+            read_chr[qName][read_order] = 'NA'
+    return read_chr
+
 def get_unpaired_info_chr(unpaired_bam, unpaired_info, unpaired_info_chr):
     info_dict = readtable(unpaired_info)
     ofile  = open(unpaired_info_chr, 'w')
@@ -258,15 +315,26 @@ def map_reads_bwa_mp_runner(flanking_fq_list, scripts, path, genome_file, fastq_
         unpaired_bam      = '%s/bwa_aln/%s.%s.bwa.unPaired.bam' %(path, target, fq_name)
         unpaired_info     = '%s/flanking_seq/%s.unPaired.info' %(path, fq_name)
         unpaired_info_chr = '%s/flanking_seq/%s.unPaired.info.chr' %(path, fq_name)
+        mate_bam          = '%s/bwa_aln/%s.%s.bwa.mates.bam' %(path, target, fq_name)
+        repeat_name_1     = '%s/te_containing_fq/%s_1.te_repeat.read_repeat_name.txt' %(path, os.path.split(file_pre)[1])
+        repeat_name_chr_1 = '%s/te_containing_fq/%s_1.te_repeat.read_repeat_name.chr.txt' %(path, os.path.split(file_pre)[1])
+        repeat_name_2     = '%s/te_containing_fq/%s_2.te_repeat.read_repeat_name.txt' %(path, os.path.split(file_pre)[1])
+        repeat_name_chr_2 = '%s/te_containing_fq/%s_2.te_repeat.read_repeat_name.chr.txt' %(path, os.path.split(file_pre)[1])
+        read_chr_info     = defaultdict(lambda : defaultdict(lambda : str()))
         if int(os.path.getsize(match1)) > 0 and int(os.path.getsize(match2)) > 0:
             #map paired-reads
             bwa_run_paired(path, genome_file, match1, match2, fq_name, target, bwa, samtools)
             out_files.append('%s/bwa_aln/%s.%s.bwa.mates.bam' %(path, target, fq_name))
+            read_chr_info.update(get_read_chr(mate_bam))
         if int(os.path.getsize(unpaired) > 0):
             #map unpaired-reads
             bwa_run(path, genome_file, unpaired, fq_name, target, 'unPaired', bwa, samtools)
             get_unpaired_info_chr(unpaired_bam, unpaired_info, unpaired_info_chr)
             out_files.append('%s/bwa_aln/%s.%s.bwa.unPaired.bam' %(path, target, fq_name))
+            read_chr_info.update(get_read_chr(unpaired_bam))
+        write_repeat_name_chr(read_chr_info, repeat_name_1, repeat_name_chr_1, 1)
+        write_repeat_name_chr(read_chr_info, repeat_name_2, repeat_name_chr_2, 2)
+        read_chr_info.clear()
         #get full reads of junction reads and their pairs
         #map these reads to genome and use perfect mapped reads as control for false junctions
         fullread1_id = '%s.fullreads.id' %(match1)
@@ -399,6 +467,23 @@ def map_reads_bwa(scripts, flanking_fq, path, genome_file, fastq_dir, target, bw
                         print >> info_chr_fh[unit[2]], line
     for temp_chr in info_chr_fh:
         info_chr_fh[temp_chr].close()
+
+    ##merge repeat_name_chr file and split into chr base files
+    repeat_chr_fh    = {}
+    repeat_chr_files = glob.glob('%s/te_containing_fq/*.te_repeat.read_repeat_name.chr.txt' %(path))
+    for repeat_chr_file in repeat_chr_files:
+        with open (repeat_chr_file, 'r') as filehd:
+            for line in filehd:
+                line = line.rstrip()
+                if len(line) > 2: 
+                    unit = re.split(r'\t',line)
+                    if not repeat_chr_fh.has_key(unit[3]):
+                        repeat_chr_fh[unit[3]] = open('%s/te_containing_fq/%s.read_repeat_name.split.txt' %(path, unit[3]), 'w')
+                        print >> repeat_chr_fh[unit[3]], line
+                    else:
+                        print >> repeat_chr_fh[unit[3]], line
+    for temp_chr in repeat_chr_fh:
+        repeat_chr_fh[temp_chr].close() 
 
 def bowtie_run(path, genome_file, fastq, fq_name, target, bowtie2, relax_align, bowtie_sam, readclass):
     if bowtie2 != 1 and bowtie_sam and relax_align != 1:
