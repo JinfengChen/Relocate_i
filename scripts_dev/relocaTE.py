@@ -377,7 +377,7 @@ def main():
     #step2 fastq to fasta
     shells_step2 = []
     fastq_dict = defaultdict(lambda : str)
-    if mode == 'fastq' and args.split:
+    if mode == 'fastq' and args.split and ('2' in list(args.step) or '3' in list(args.step)):
         fastqs = glob.glob('%s/*.f*q*' %(fastq_dir))
         step2_flag   = 0
         step2_count  = 0
@@ -441,7 +441,7 @@ def main():
                 else:
                     mp_pool(shells_step2, int(args.cpu))
 
-    elif mode == 'fastq':
+    elif mode == 'fastq' and ('2' in list(args.step) or '3' in list(args.step)):
         fastqs = glob.glob('%s/*.f*q*' %(fastq_dir))
         step2_flag = 0
         step2_count= 0
@@ -485,7 +485,7 @@ def main():
             else:
                 mp_pool(shells_step2, int(args.cpu))
  
-    elif mode == 'bam':
+    elif mode == 'bam' and ('2' in list(args.step) or '3' in list(args.step)):
         #print 'Add module of obtaining reads from bam then prepare as fa files'
         cmd_step2 = []
         fastq_dir = '%s/repeat/fastq' %(args.outdir)
@@ -629,7 +629,7 @@ def main():
     ids = fasta_id(reference)
     createdir('%s/shellscripts/step_5' %(args.outdir))
     step5_count = 0
-    ids = ['chr1']
+    #ids = ['chr1']
     for chrs in ids:
         print 'find insertions on %s' %(chrs)
         step5_cmd = 'python %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s %s 0 %s %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.mismatch_junction, args.size, args.verbose)

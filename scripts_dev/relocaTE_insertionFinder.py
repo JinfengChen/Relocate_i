@@ -76,6 +76,7 @@ def Supporting_count(event, tsd_start, teSupportingReads):
 def read_repeat_name(infiles):
     data = defaultdict(list)
     for infile in infiles:
+        #print 'read repeat name file: %s' %(infile)
         with open (infile, 'r') as filehd:
             for line in filehd:
                 line = line.rstrip()
@@ -140,7 +141,8 @@ def insertion_family(reads, read_repeat):
 def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size, teLowQualityReads, teFullReads):
     createdir(result)
     ###remove insertion 
-    existingTE_bed = '%s/existingTE.bed' %('/'.join(top_dir))
+    existingTE_bed     = '%s/existingTE.bed' %('/'.join(top_dir))
+    existingTE_bed_chr = '%s/existingTE.%s.bed' %('/'.join(top_dir), usr_target)
     nonref     = '%s/%s.%s.all_nonref_insert.txt' %(result, usr_target, TE)
     nonref_gff = '%s/%s.%s.all_nonref_insert.gff' %(result, usr_target, TE)
     nonsup     = '%s/%s.%s.all_nonref_supporting.txt' %(result, usr_target, TE)
@@ -464,7 +466,9 @@ def write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_r
     txt2gff(nonref, nonref_gff, 'Non-reference, not found in reference')
     txt2gff(nonsup, nonsup_gff, 'Non-reference, not found in reference')
     if os.path.isfile(nonsup_gff) and os.path.getsize(nonsup_gff) > 0:
-        os.system('%s intersect -v -a %s -b %s >> %s' %(bedtools, nonsup_gff, existingTE_bed, nonref_gff))
+        os.system('grep -P \"%s\\t\" %s > %s' %(usr_target, existingTE_bed, existingTE_bed_chr))
+        os.system('%s intersect -v -a %s -b %s >> %s' %(bedtools, nonsup_gff, existingTE_bed_chr, nonref_gff))
+        os.system('rm %s' %(existingTE_bed_chr))
 
 def lowquality_reads(left_jun_reads, right_jun_reads, teLowQualityReads):
     real_c, real_t, real_left_t, real_right_t = [0,0,0,0]
@@ -950,7 +954,7 @@ def existingTE(infile, existingTE_inf, existingTE_found):
                         existingTE_found[line]['end']  = 0
 
 
-def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
+def existingTE_RM_ALL(top_dir, infile, existingTE_inf, chro):
     #ofile_RM = open('%s/existingTE.bed' %(top_dir), 'w')
     with open (infile, 'r') as filehd:
         for line in filehd:
@@ -961,6 +965,8 @@ def existingTE_RM_ALL(top_dir, infile, existingTE_inf):
                     unit.insert(0, '')
                 #print line
                 #print unit[6], unit[7], unit[9], unit[12], unit[13], unit[14]
+                if not unit[5] == chro:
+                    continue
                 if unit[9] == '+':
                     for i in range(int(unit[6])-2, int(unit[6])+3):
                         existingTE_inf[unit[5]]['start'][int(i)] = 1
@@ -1740,9 +1746,9 @@ def main():
     r_te = re.compile(r'repeatmasker|rm|\.out', re.IGNORECASE)
     if os.path.isfile(existing_TE) and os.path.getsize(existing_TE) > 0:
         if r_te.search(existing_TE):
-            existingTE_RM_ALL('/'.join(top_dir), existing_TE, existingTE_inf)
-        else:
-            existingTE('/'.join(top_dir), existing_TE, existingTE_inf, existingTE_found)
+            existingTE_RM_ALL('/'.join(top_dir), existing_TE, existingTE_inf, usr_target)
+        #else:
+        #    existingTE('/'.join(top_dir), existing_TE, existingTE_inf, existingTE_found)
     else:
         print 'Existing TE file does not exists or zero size'
 
@@ -1763,17 +1769,6 @@ def main():
     TSD       = mate_file[3]
     TSDpattern= 1 if s.search(TSD) else 0
 
-    
-    ##remove redundant alignment, no need to if we used combined bam file from previous step
-    #sorted_align = defaultdict(lambda : str)
-    #if bwa == 1:
-    #    sorted_align = remove_redundant_sam(align_file, usr_target)
-    #elif bowtie_sam == 1:
-    #    sorted_align = remove_redundant_sam(align_file, usr_target)
-    #else:
-    #    print 'We accept only sam format right now'
-    #    usage() 
-    #    exit(2)
 
     ##read -> repeat relation
     #top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
@@ -1783,7 +1778,6 @@ def main():
         read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.split.txt' %('/'.join(top_dir)))
     else:
         read_repeat_files = glob.glob('%s/te_containing_fq/%s.read_repeat_name.split.txt' %('/'.join(top_dir), usr_target))
-    #read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
     read_repeat = read_repeat_name(read_repeat_files)
 
     #read and store full length reads alignment on genome
@@ -1799,15 +1793,10 @@ def main():
     read_unpaired_read_info(unpaired_read_info, teReadsInfo) 
 
     ##cluster reads around insertions
-    #find_insertion_cluster_sam(sorted_align, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found)
     find_insertion_cluster_bam(align_file, read_repeat, usr_target, TSD, teInsertions, teInsertions_reads, teReadClusters, teReadClusters_count, teReadClusters_depth, existingTE_inf, existingTE_found, teSupportingReads, teLowQualityReads, teJunctionReads, teFullReads, teReadsInfo, mm_allow)
 
 
     ##output insertions
-    #top_dir = re.split(r'/', os.path.dirname(os.path.abspath(align_file)))[:-1]
-    #result  = '%s/results' %('/'.join(top_dir))
-    #read_repeat_files = glob.glob('%s/te_containing_fq/*.read_repeat_name.txt' %('/'.join(top_dir)))
-    #read_repeat = read_repeat_name(read_repeat_files)
     write_output(top_dir, result, read_repeat, usr_target, exper, TE, required_reads, required_left_reads, required_right_reads, teInsertions, teInsertions_reads, teSupportingReads, existingTE_inf, teReadClusters, bedtools, lib_size, teLowQualityReads, teFullReads)
 
  
