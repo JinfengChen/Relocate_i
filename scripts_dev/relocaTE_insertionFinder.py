@@ -1341,11 +1341,11 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             #end    = int(start) + int(length) - 1 #should not allowed for indel or softclip
             end    = int(record.reference_end) + 1
             #print 'end compare %s: %s, %s' %(name, end)
-            if verbose > 2: print 'find_insertion_bam: %s\t%s' %(name, start)
+            if verbose > 4: print 'find_insertion_bam: %s\t%s' %(name, start)
             #filter false junctions
             if r.search(name):
                 #only for junction reads
-                if verbose > 2: print 'Junction: %s\t%s\t%s\t%s' %(name, chro, start, end)
+                if verbose > 4: print 'Junction: %s\t%s\t%s\t%s' %(name, chro, start, end)
                 extend = 10
                 read_order = 0
                 if record.is_read1:
@@ -1353,8 +1353,11 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                 elif record.is_read2:
                     read_order = 2
                 jun_read_name = r.search(name).groups(0)[0]
+                if verbose > 4: print 'Jun_read_name: %s' %(jun_read_name)
                 if jun_read_name[-2:] == '/1':
-                    if not teJunctionReads.has_key(jun_read_name[:-2]):
+                    if verbose > 4: print 'Jun_read_name: /1'
+                    if not teJunctionReads.has_key(jun_read_name[:-2]) or not teJunctionReads[jun_read_name[:-2]].has_key(1):
+                        if verbose > 4: print 'Jun_read_name is not a key of teJunctionReads'
                         continue
                     #read has label for read1, we use label for both paired or unpaired reads
                     #if teJunctionReads[jun_read_name[:-2]][1] == 1:
@@ -1375,7 +1378,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                         #we remove these junction read as fullreads too
                     #    teFullReads[name] = 1
                 elif jun_read_name[-2:] == '/2':
-                    if not teJunctionReads.has_key(jun_read_name[:-2]):
+                    if not teJunctionReads.has_key(jun_read_name[:-2]) or not teJunctionReads[jun_read_name[:-2]].has_key(2):
                         continue
                     #read has label for read2, we use label for both paired or unpaired reads
                     #if teJunctionReads[jun_read_name[:-2]][2] == 1:
@@ -1393,7 +1396,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                     #elif not teJunctionReads[jun_read_name[:-2]][2][0] == 0:
                     #    teFullReads[name] = 1
                 elif read_order == 1 or read_order == 2:
-                    if not teJunctionReads.has_key(jun_read_name):
+                    if not teJunctionReads.has_key(jun_read_name) or not teJunctionReads[jun_read_name].has_key(read_order):
                         continue
                     #read do not have label, read is paired and read is read1
                     #if teJunctionReads[jun_read_name][1] == 1:
@@ -1417,10 +1420,10 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                         #fullread mapped to genome
                 #        teFullReads[name] = 1
                 else:
-                    #read do not have label, read is unpaired, need to use unPaired_read_info
+                    #read do not have label: read is unpaired, need to use unPaired_read_info
                     if teReadsInfo.has_key(name):
                         if teReadsInfo[name] == 1:
-                            if not teJunctionReads.has_key(jun_read_name):
+                            if not teJunctionReads.has_key(jun_read_name) and not teJunctionReads[jun_read_name].has_key(1):
                                 continue
                             #read1
                             #if teJunctionReads[jun_read_name][1] == 1:
@@ -1438,7 +1441,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                             #elif not teJunctionReads[jun_read_name][1][0] == 0:
                             #    teFullReads[name] = 1
                         elif teReadsInfo[name] == 2:
-                            if not teJunctionReads.has_key(jun_read_name):
+                            if not teJunctionReads.has_key(jun_read_name) and not teJunctionReads[jun_read_name].has_key(2):
                                 continue
                             #read2
                             #if teJunctionReads[jun_read_name][2] == 1:
@@ -1490,7 +1493,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             if r_cg2.search(cigar): 
                 cg_flag = 1
             tags = convert_tag(tag)
-            if verbose > 2: print '%s\t%s\t%s\t%s' %(name, start, MAPQ, tag)
+            if verbose > 4: print '%s\t%s\t%s\t%s' %(name, start, MAPQ, tag)
             # filter low quality mapping reads: 
             # 1. paired-end reads at least have one reads unique mapped (MAPQ set to 0 for both reads if both are repeat, else should be > 0 at least one unique mapped)
             # 2. unpaired reads should unique mapped, no gap, mismatch <= 3 and no suboptimal alignment
@@ -1498,7 +1501,7 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
             #if record.is_proper_pair and (int(MAPQ) >= 29 or tags['XT'] == 'U'):
             #if record.is_proper_pair and int(MAPQ) > 0:
             if record.is_proper_pair:
-                if verbose > 2: print 'is proper paired'
+                if verbose > 4: print 'is proper paired'
                 #store low quality read in dict
                 if int(MAPQ) < 29:
                     x1 = int(tags['X1']) if tags.has_key('X1') else 0
@@ -1514,10 +1517,10 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             #elif not record.is_paired:
             else:
-                if verbose > 2: print 'is not paired or not proper paired'
+                if verbose > 4: print 'is not paired or not proper paired'
                 #store low quality read in dict, not properly paired is low quality
                 if int(MAPQ) < 29 or record.is_paired:
-                    if verbose > 2: print 'low quality reads'
+                    if verbose > 4: print 'low quality reads'
                     x1 = int(tags['X1']) if tags.has_key('X1') else 0
                     xm = int(tags['XM']) if tags.has_key('XM') else 0
                     xo = int(tags['XO']) if tags.has_key('XO') else 0
@@ -1527,11 +1530,11 @@ def find_insertion_cluster_bam(align_file, read_repeat, target, TSD, teInsertion
                 #if tags['XT'] == 'U' and int(tags['XO']) == 0 and int(tags['X1']) <= 3:
                 if r.search(name): #junction reads, allowed only 1 mismatch
                     if tags['XT'] == 'U' and int(tags['XM']) <= int(mm_allow) and int(tags['X1']) <= 3:
-                        if verbose > 2: print 'junction pass'
+                        if verbose > 4: print 'junction pass'
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
                 else:
                     if tags['XT'] == 'U' and int(tags['XM']) <= int(mm_allow) and int(tags['X1']) <= 3:
-                        if verbose > 2: print 'supporting pass'
+                        if verbose > 4: print 'supporting pass'
                         bin_ins, count = align_process(bin_ins, read_repeat, record, r, r_tsd, count, seq, chro, start, end, name, TSD, strand, teInsertions, teInsertions_reads, existingTE_inf, existingTE_found, teReadClusters, teReadClusters_count, teReadClusters_depth, teSupportingReads)
             teReadClusters[count]['read_inf']['seq']['chr'] = chro
             #print 'after: %s\t%s\t%s' %(name, count, bin_ins)
@@ -1647,7 +1650,7 @@ def read_junction_reads_align(align_file_f, read_repeat, teJunctionReads):
             end    = int(record.reference_end) + 1
             match  = 0
             tags   = convert_tag(tag)
-            #print 'read junction align: %s\t%s\t%s\t%s' %(name, read_order, seq, tag)
+            if verbose > 4: print 'read junction align: %s\t%s\t%s\t%s' %(name, read_order, seq, tag)
             for (key, length) in record.cigartuples:
                 #print key, length
                 if int(key) == 0:
@@ -1670,7 +1673,7 @@ def read_junction_reads_align(align_file_f, read_repeat, teJunctionReads):
             read_name2 = '%s/2' %(name)
             if read_repeat.has_key(read_name0) or read_repeat.has_key(read_name1) or read_repeat.has_key(read_name2):
                 teJunctionReads[name][read_order] = [chro, start, end, intact_flag]
-            #print 'TE_junction_reads: %s\t%s\t%s\t%s' %(name, chro, start, end)
+                if verbose > 4: print 'TE_junction_reads, chromosome specific: %s\t%s\t%s\t%s' %(name, chro, start, end)
             #else:
             #    teJunctionReads[name][read_order] = [0, 0, 0, 0]
         else:

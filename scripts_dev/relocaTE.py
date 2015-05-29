@@ -629,7 +629,7 @@ def main():
     ids = fasta_id(reference)
     createdir('%s/shellscripts/step_5' %(args.outdir))
     step5_count = 0
-    #ids = ['chr1']
+    #ids = ['chr13']
     for chrs in ids:
         print 'find insertions on %s' %(chrs)
         step5_cmd = 'python %s/relocaTE_insertionFinder.py %s/repeat/bwa_aln/%s.repeat.bwa.sorted.bam %s %s repeat %s/regex.txt not.give 100 %s %s 0 %s %s' %(RelocaTE_bin, args.outdir, ref, chrs, reference, args.outdir, reference_ins_flag, args.mismatch_junction, args.size, args.verbose)
@@ -649,7 +649,7 @@ def main():
 
 
     #step6 find transposons on reference: reference only or shared
-    print 'Step5: Find reference insertions'
+    print 'Step6: Find reference insertions'
     shells_step6 = []
     createdir('%s/shellscripts/step_6' %(args.outdir))
     step6_count = 0
