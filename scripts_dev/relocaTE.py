@@ -556,9 +556,9 @@ def main():
             bwastd  = '%s/repeat/blat_output/bwa.out' %(args.outdir)
             bwacmd  = ''
             if args.split:
-                bwacmd  = '%s mem -t %s -k 15 -T 10 %s %s | %s view -Shb -F 4 - > %s 2> %s' %(bwa, 1, te_fasta, fq, samtools, bwaout, bwastd)
+                bwacmd  = '%s mem -t %s -O2,2 -k 15 -T 10 %s %s | %s view -Shb -F 4 - > %s 2> %s' %(bwa, 1, te_fasta, fq, samtools, bwaout, bwastd)
             else:
-                bwacmd  = '%s mem -t %s -k 15 -T 10 %s %s | %s view -Shb -F 4 - > %s 2> %s' %(bwa, args.cpu, te_fasta, fq, samtools, bwaout, bwastd)
+                bwacmd  = '%s mem -t %s -O2,2 -k 15 -T 10 %s %s | %s view -Shb -F 4 - > %s 2> %s' %(bwa, args.cpu, te_fasta, fq, samtools, bwaout, bwastd)
             flank   = '%s/repeat/flanking_seq/%s.te_repeat.flankingReads.fq' %(args.outdir, fq_prefix)
             trim    = 'python %s/relocaTE_trim.py %s %s %s %s %s > %s' %(RelocaTE_bin, bwaout, fq, args.len_cut_match, args.len_cut_trim, args.mismatch, flank)
             step3_file = '%s/shellscripts/step_3/%s.te_repeat.bwa.sh' %(args.outdir, step3_count)

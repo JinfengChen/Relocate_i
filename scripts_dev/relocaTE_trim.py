@@ -172,13 +172,20 @@ def parse_align_bwa(infile, tandem):
             #match and mismatch
             tag      = record.tags if record.tags else []
             tags     = convert_tag(tag)
-            mismatch = int(tags['NM'])
+            #mismatch = int(tags['NM'])
             #match    = int(record.query_alignment_length) - mismatch
             match    = 0
+            ins0     = 0
+            del0     = 0
             for (key, length) in record.cigartuples:
                 #print key, length
                 if int(key) == 0:
                     match += length
+                elif int(key) == 1:
+                    ins0 += length
+                elif int(key) == 2:
+                    del0 += length
+            mismatch= int(tags['NM']) - int(ins0) - int(del0)
             match   = match - mismatch
             #strand, flag is 0 is read if read is unpaired and mapped to plus strand
             strand   = ''
@@ -188,9 +195,25 @@ def parse_align_bwa(infile, tandem):
             else:
                 strand = '-' if record.is_reverse else '+'
             #update data
-            boundary = 1 if int(qStart) == 0 or int(qEnd) + 1 == int(qLen) else 0 
+            #boundary = 1 if int(qStart) == 0 or int(qEnd) + 1 == int(qLen) else 0 
             addRecord = 0
-            #print qName, qLen, qStart, qEnd, tName, tLen, tStart, tEnd, match, mismatch, boundary
+            boundary  = 0
+            boundary_qry_left = 0
+            boundary_tar_left = 0
+            boundary_qry_right = 0
+            boundary_tar_right = 0
+            if int(qStart) == 0 or int(qStart) <= 2:
+                boundary_qry_left  = 1
+            if int(qEnd) + 1 == int(qLen) or int(qEnd) >= int(qLen) - 3:
+                boundary_qry_right = 1 
+            if int(tStart) == 0 or int(tStart) <= 2:
+                boundary_tar_left  = 1
+            if int(tEnd) + 1 == int(tLen) or int(tEnd) >= int(tLen) - 3:
+                boundary_tar_right = 1
+            #max boundary should be 2: 1. match one read end and one repeat end; 2. match two read end and internal of repeat
+            #we expect more boundary and compare match length when having equal number of boundary
+            boundary = boundary_qry_left + boundary_tar_left + boundary_qry_right + boundary_tar_right
+            #print >> sys.stderr, qName, qLen, qStart, qEnd, tName, tLen, tStart, tEnd, match, mismatch, boundary
             if coord.has_key(qName):
                 ##keep the best match to TE
                 if int(boundary) > int(coord[qName]['boundary']):
@@ -206,7 +229,7 @@ def parse_align_bwa(infile, tandem):
                 addRecord = 1
              
             #final data
-            #print qName, qStart, qEnd, match, addRecord
+            #print >> sys.stderr, qName, qStart, qEnd, match, addRecord
             if addRecord == 1:
                 coord[qName]['match']    = match
                 coord[qName]['len']      = qLen
