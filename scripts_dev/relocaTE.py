@@ -706,7 +706,7 @@ def main():
     clean_cmd.append('rm -R %s/repeat/te_only_read_portions_fa' %(args.outdir))
     clean_cmd.append('rm -R %s/repeat/fastq_split' %(args.outdir))
     clean_cmd.append('rm %s/repeat/bwa_aln/*.mates.bam* %s/repeat/bwa_aln/*.unPaired.bam* %s/repeat/bwa_aln/*.bwa.bam*' %(args.outdir, args.outdir, args.outdir))
-    clean_file = '%s/clean_intermedian_files.sh' %(args.outdir)
+    clean_file = '%s/clean_intermediate_files.sh' %(args.outdir)
     writefile(clean_file, '\n'.join(clean_cmd))
     if int(args.verbose) <= 2:
         shells.append('sh %s' %(clean_file))
