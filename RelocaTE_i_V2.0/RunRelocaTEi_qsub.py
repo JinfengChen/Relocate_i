@@ -123,7 +123,7 @@ echo "Done"
                 #print read_pre, existingTE
                 # relocate will not run if there is result exists
                 if not os.path.exists('./%s/%s' %(rep_read_dir, outdir)):
-                    relocaTE = '%s --te_fasta %s --genome_fasta %s --fq_dir %s --outdir %s --reference_ins %s --step 567 --len_cut_match 10 --len_cut_trim 10 --mismatch 2 --aligner blat --split --cpu 6 --run' %(RelocaTE, Repeat, Reference, read_dir, outdir, existingTE)
+                    relocaTE = '%s --te_fasta %s --genome_fasta %s --fq_dir %s --outdir %s --reference_ins %s --step 1234567 --len_cut_match 10 --len_cut_trim 10 --mismatch 2 --aligner blat --split --cpu $PBS_NP --run' %(RelocaTE, Repeat, Reference, read_dir, outdir, existingTE)
                     print relocaTE
                     #shell    = 'bash ./%s/run_these_jobs.sh > ./%s/run.log 2>&1' %(outdir, outdir)
                     #mv       = 'mv %s %s' %(outdir, rep_read_dir)

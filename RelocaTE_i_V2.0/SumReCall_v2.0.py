@@ -184,7 +184,7 @@ def main():
                 non_ref_txt = '%s/repeat/results/%s.repeat.all_nonref_insert.txt' %(call, chro)
                 non_ref_gff = '%s/repeat/results/%s.repeat.all_nonref_insert.gff' %(call, chro)
                 non_ref_gff_char = '%s/repeat/results/ALL.all_nonref_insert.characTErized.gff' %(call)
-                non_ref_gff_all  = '%s/repeat/results/ALL.all_nonref_insert.gff' %(call)
+                non_ref_gff_all  = '%s/repeat/results/ALL.all_nonref_insert.high_conf.gff' %(call)
                 convertgff  = 'perl /rhome/cjinfeng/software/bin/relocate2gff.pl --mping %s' %(non_ref_txt)
                 if not os.path.isfile(non_ref_gff):
                     os.system(convertgff)
